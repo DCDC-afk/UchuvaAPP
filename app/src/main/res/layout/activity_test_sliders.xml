@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F1115"
+    android:orientation="vertical">
+
+    <com.example.uchuvatwinapp.MapaDigitalView
+        android:id="@+id/mapaTest"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1A1D24"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tvDistanciaInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFF"
+            android:text="Distancia entre Módulos (Y): 0.80m" />
+        <SeekBar
+            android:id="@+id/sbDistanciaY"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="300"
+            android:progress="80" />
+
+        <TextView
+            android:id="@+id/tvEscalaInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFF"
+            android:layout_marginTop="10dp"
+            android:text="Escala de SVG (Tamaño): 0.60x" />
+        <SeekBar
+            android:id="@+id/sbEscalaSVG"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="200"
+            android:progress="60" />
+
+        <TextView
+            android:id="@+id/tvPxMetroInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFF"
+            android:layout_marginTop="10dp"
+            android:text="Pixeles por Metro (Zoom General): 450px" />
+        <SeekBar
+            android:id="@+id/sbPxMetro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="1000"
+            android:progress="450" />
+
+    </LinearLayout>
+</LinearLayout>

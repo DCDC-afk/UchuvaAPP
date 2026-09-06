@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Colores Base Modo Oscuro Forzado -->
+    <color name="tech_background">#0F1115</color> <!-- Fondo principal, casi negro -->
+    <color name="tech_surface">#1A1D24</color>    <!-- Fondo de las tarjetas -->
+    <color name="tech_surface_variant">#232730</color> <!-- Tarjetas secundarias -->
+
+    <!-- Nuevo Acento: Naranja Uchuva Tech -->
+    <color name="tech_primary">#FF9900</color>
+    <color name="tech_primary_variant">#E67A00</color>
+
+    <!-- Textos y Bordes -->
+    <color name="tech_text_high">#FFFFFF</color>
+    <color name="tech_text_medium">#9BA1A6</color> <!-- Gris azulado para subtítulos -->
+    <color name="tech_outline">#2A2F3A</color> <!-- Bordes de las tarjetas -->
+
+    <!-- Semántica de estado -->
+    <color name="tech_alert">#FF3D00</color> <!-- Rojo tecnológico para errores -->
+    <color name="tech_success">#00E676</color> <!-- Verde brillante para sistemas OK -->
+</resources>

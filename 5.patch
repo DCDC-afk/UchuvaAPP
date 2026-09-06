@@ -1,0 +1,58 @@
+Index: app/src/main/java/com/example/uchuvatwinapp/MainActivity.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/uchuvatwinapp/MainActivity.kt b/app/src/main/java/com/example/uchuvatwinapp/MainActivity.kt
+--- a/app/src/main/java/com/example/uchuvatwinapp/MainActivity.kt
++++ b/app/src/main/java/com/example/uchuvatwinapp/MainActivity.kt	(date 1785457902965)
+@@ -191,7 +191,6 @@
+ 
+                     totalGeneral += uchuvasDelArbusto.size
+ 
+-                    // Conteo corregido usando la lógica pastel: Maduras son Verdes, Inmaduras son Amarillas
+                     madurasGeneral += uchuvasDelArbusto.count { it.estado.equals("Maduro", ignoreCase = true) }
+                     inmadurasGeneral += uchuvasDelArbusto.count { it.estado.equals("Inmaduro", ignoreCase = true) }
+ 
+@@ -248,13 +247,14 @@
+         panelDetalle.visibility = View.VISIBLE
+ 
+         tvDetalleId.text = "UCHUVA ID: #${uchuva.id}"
++        tvDetalleId.setTextColor(Color.parseColor("#FFF59D")) // Amarillo Pastel
++
+         tvDetalleEstado.text = "ESTADO: ${uchuva.estado.uppercase(Locale.ROOT)}"
+ 
+-        // Colores pasteles aplicados a la selección
+         if (uchuva.estado.equals("Maduro", ignoreCase = true)) {
+-            tvDetalleEstado.setTextColor(Color.parseColor("#A5D6A7")) // Verde Pastel
++            tvDetalleEstado.setTextColor(Color.parseColor("#D36D42")) // Naranja Pastel
+         } else {
+-            tvDetalleEstado.setTextColor(Color.parseColor("#FFF59D")) // Amarillo Pastel
++            tvDetalleEstado.setTextColor(Color.parseColor("#A5D6A7")) // Verde Pastel
+         }
+ 
+         val porcConfianza = String.format(Locale.US, "%.1f", uchuva.confianza * 100f)
+@@ -267,7 +267,6 @@
+         tvDetalleFrame.text = "FRAME VIDEO: #${uchuva.frameCruce}"
+     }
+ 
+-    // --- NUEVO ADAPTADOR COMPACTO Y PASTEL ---
+     inner class MenuLotesAdapter(
+         private val lotes: List<File>,
+         private val onClick: (File) -> Unit
+@@ -279,7 +278,6 @@
+         }
+ 
+         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+-            // Utilizamos el nuevo XML creado para esta vista
+             val view = LayoutInflater.from(parent.context).inflate(R.layout.item_menu_gemelo, parent, false)
+             return ViewHolder(view)
+         }
+@@ -288,7 +286,6 @@
+             val archivoLote = lotes[position]
+             holder.tvNombreLoteMenuGemelo.text = archivoLote.name.replace("_procesado", "").uppercase()
+ 
+-            // Leemos el metadata.txt heredado para mostrar la fecha original de captura
+             val metaFile = File(archivoLote, "metadata.txt")
+             holder.tvFechaLoteMenuGemelo.text = if (metaFile.exists()) metaFile.readText() else "Fecha desconocida"
+ 

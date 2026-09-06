@@ -1,0 +1,256 @@
+Index: app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt b/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt
+--- a/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt
++++ b/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt	(date 1785397538980)
+@@ -28,7 +28,6 @@
+ 
+ class DronActivity : ComponentActivity() {
+ 
+-    // Referencias a las cápsulas tecno-orgánicas (Cards)
+     private lateinit var cardControl: MaterialCardView
+     private lateinit var cardDescarga: MaterialCardView
+     private lateinit var cardProcesar: MaterialCardView
+@@ -43,15 +42,12 @@
+     private lateinit var btnVolverLotes: MaterialButton
+     private lateinit var rvGestorArchivos: RecyclerView
+ 
+-    // --- Referencias a la barra de telemetría ---
+     private lateinit var tvEstadoConexion: TextView
+     private lateinit var tvBateria: TextView
+     private lateinit var tvAlmacenamiento: TextView
+     private lateinit var tvVideosCola: TextView
+-    private lateinit var ivUchuvaEstado: ImageView // Nueva referencia de la imagen
+-
++    private lateinit var ivUchuvaEstado: ImageView
+     private lateinit var ivBateriaHoja: ImageView
+-
+     private lateinit var ivSdUchuva: ImageView
+ 
+     private lateinit var rvLotesProcesables: RecyclerView
+@@ -80,7 +76,6 @@
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+ 
+-        // Transiciones Z-Axis
+         window.enterTransition = com.google.android.material.transition.platform.MaterialSharedAxis(
+             com.google.android.material.transition.platform.MaterialSharedAxis.Z, true
+         ).apply { duration = 350L }
+@@ -111,7 +106,7 @@
+         tvBateria = findViewById(R.id.tvBateria)
+         tvAlmacenamiento = findViewById(R.id.tvAlmacenamiento)
+         tvVideosCola = findViewById(R.id.tvVideosCola)
+-        ivUchuvaEstado = findViewById(R.id.ivUchuvaEstado) // Inicializar ImageView
++        ivUchuvaEstado = findViewById(R.id.ivUchuvaEstado)
+         ivBateriaHoja = findViewById(R.id.ivBateriaHoja)
+         ivSdUchuva = findViewById(R.id.ivSdUchuva)
+ 
+@@ -132,14 +127,12 @@
+             btnIniciarProcesamiento.isEnabled = true
+ 
+             if (lote.estaProcesado) {
+-                // --- BOTÓN RE-PROCESAR (Amarillo Outlined) ---
+                 btnIniciarProcesamiento.text = "RE-PROCESAR (SOBRESCRIBIR)"
+                 btnIniciarProcesamiento.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+                 btnIniciarProcesamiento.strokeColor = ColorStateList.valueOf(Color.parseColor("#FFF59D"))
+                 btnIniciarProcesamiento.strokeWidth = 4
+                 btnIniciarProcesamiento.setTextColor(Color.parseColor("#FFF59D"))
+             } else {
+-                // --- BOTÓN PROCESAR (Naranja Sólido) ---
+                 btnIniciarProcesamiento.text = "PROCESAR LOTE COMPLETO"
+                 btnIniciarProcesamiento.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#D36D42"))
+                 btnIniciarProcesamiento.strokeWidth = 0
+@@ -159,15 +152,73 @@
+         btnVolverLotes.setOnClickListener { cargarLotesLocalesEnUI() }
+         btnIniciarProcesamiento.setOnClickListener { iniciarProcesamientoMasivo() }
+ 
+-        // Cargar por defecto la uchuva naranja como estado inicial
+         ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_naranja)
+ 
+         cargarLotesLocalesEnUI()
+-        cambiarModo(1)
++
++        if (GestorProcesamiento.isProcesando) {
++            mostrarUIProcesando()
++        } else {
++            cambiarModo(1)
++        }
+ 
+         handlerTelemetria.post(runnableTelemetria)
+     }
+ 
++    override fun onResume() {
++        super.onResume()
++        vincularEventosProcesamiento()
++
++        if (GestorProcesamiento.isProcesando) {
++            mostrarUIProcesando()
++            GestorProcesamiento.onProgresoUI?.invoke(
++                GestorProcesamiento.progresoActual,
++                GestorProcesamiento.totalActual,
++                GestorProcesamiento.videoActualNombre
++            )
++        }
++    }
++
++    override fun onPause() {
++        super.onPause()
++        GestorProcesamiento.onProgresoUI = null
++        GestorProcesamiento.onFinalizadoUI = null
++    }
++
++    private fun vincularEventosProcesamiento() {
++        GestorProcesamiento.onProgresoUI = { actual, total, nombreVideo ->
++            Handler(Looper.getMainLooper()).post {
++                if (panelProcesamiento.visibility == View.VISIBLE) {
++                    tvProgresoLote.text = "Analizando: $nombreVideo\nVideo $actual de $total"
++                    pbProcesamientoLote.max = total
++                    pbProcesamientoLote.progress = actual
++                }
++            }
++        }
++
++        GestorProcesamiento.onFinalizadoUI = {
++            Handler(Looper.getMainLooper()).post {
++                Toast.makeText(this@DronActivity, "Lote Procesado Exitosamente", Toast.LENGTH_LONG).show()
++                panelProgresoLote.visibility = View.GONE
++                btnIniciarProcesamiento.visibility = View.VISIBLE
++                rvLotesProcesables.visibility = View.VISIBLE
++                btnIniciarProcesamiento.text = "SELECCIONE UNA CARPETA"
++                btnIniciarProcesamiento.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#161B22"))
++                btnIniciarProcesamiento.setTextColor(Color.parseColor("#8B949E"))
++                btnIniciarProcesamiento.strokeWidth = 0
++                btnIniciarProcesamiento.isEnabled = false
++                cargarCarpetasParaProcesar()
++            }
++        }
++    }
++
++    private fun mostrarUIProcesando() {
++        cambiarModo(3)
++        btnIniciarProcesamiento.visibility = View.GONE
++        rvLotesProcesables.visibility = View.GONE
++        panelProgresoLote.visibility = View.VISIBLE
++    }
++
+     private fun aplicarAnimacionCapsula(card: MaterialCardView, onClick: () -> Unit) {
+         card.setOnTouchListener { v, event ->
+             when (event.action) {
+@@ -209,9 +260,6 @@
+             }
+         }
+ 
+-        // --- ORDENACIÓN ---
+-        // compareBy agrupa primero por estado (false = Pendiente sube, true = Procesado baja)
+-        // y luego por el nombre de la carpeta de forma alfabética.
+         val listaOrdenada = carpetasList.sortedWith(compareBy({ it.estaProcesado }, { it.nombreCarpeta }))
+         adaptadorLotesProcesables.actualizarLista(listaOrdenada)
+     }
+@@ -219,34 +267,12 @@
+     private fun iniciarProcesamientoMasivo() {
+         val lote = loteSeleccionadoParaProcesar ?: return
+ 
+-        btnIniciarProcesamiento.visibility = View.GONE
+-        rvLotesProcesables.visibility = View.GONE
+-        panelProgresoLote.visibility = View.VISIBLE
++        mostrarUIProcesando()
+ 
+         GestorProcesamiento.procesarLoteCompleto(
+             context = this,
+             assetManager = assets,
+-            carpetaLote = lote.rutaOrigen,
+-            onProgreso = { actual, total, nombreVideo ->
+-                Handler(Looper.getMainLooper()).post {
+-                    tvProgresoLote.text = "Analizando: $nombreVideo\nVideo $actual de $total"
+-                    pbProcesamientoLote.max = total
+-                    pbProcesamientoLote.progress = actual
+-                }
+-            },
+-            onFinalizado = {
+-                Handler(Looper.getMainLooper()).post {
+-                    Toast.makeText(this, "Lote Procesado Exitosamente", Toast.LENGTH_LONG).show()
+-                    panelProgresoLote.visibility = View.GONE
+-                    btnIniciarProcesamiento.visibility = View.VISIBLE
+-                    rvLotesProcesables.visibility = View.VISIBLE
+-                    btnIniciarProcesamiento.text = "SELECCIONE UNA CARPETA"
+-                    btnIniciarProcesamiento.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#161B22"))
+-                    btnIniciarProcesamiento.setTextColor(Color.parseColor("#8B949E"))
+-                    btnIniciarProcesamiento.isEnabled = false
+-                    cargarCarpetasParaProcesar()
+-                }
+-            }
++            carpetaLote = lote.rutaOrigen
+         )
+     }
+ 
+@@ -272,33 +298,23 @@
+                 }
+ 
+                 Handler(Looper.getMainLooper()).post {
+-                    // --- MODO ONLINE (VERDE) ---
+                     tvEstadoConexion.text = "ONLINE"
+                     tvEstadoConexion.setTextColor(Color.parseColor("#A5D6A7"))
+-                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_verde) // Cambia SVG con todos sus tonos
+-
++                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_verde)
+ 
+-
+-                    // --- LÓGICA DE BATERÍA POR COLORES ---
+-                    // 1. Extraemos el número del porcentaje
+                     val porcentajeBateria = telemetria.bateria.replace("%", "").trim().toIntOrNull() ?: 0
+-
+-                    // 2. Decidimos el color pastel dependiendo del rango
+                     val colorBateriaHex = when {
+-                        porcentajeBateria >= 50 -> "#A5D6A7" // Verde Pastel
+-                        porcentajeBateria >= 20 -> "#FFF59D" // Amarillo Pastel
+-                        else -> "#EF9A9A"                    // Rojo Pastel
++                        porcentajeBateria >= 50 -> "#A5D6A7"
++                        porcentajeBateria >= 20 -> "#FFF59D"
++                        else -> "#EF9A9A"
+                     }
+ 
+-                    // 3. Aplicamos el color al Texto y a la Hoja
+                     tvBateria.text = telemetria.bateria
+                     tvBateria.setTextColor(Color.parseColor(colorBateriaHex))
+                     ivBateriaHoja.setColorFilter(Color.parseColor(colorBateriaHex))
+-                    // ------------------------------------
+ 
+                     tvAlmacenamiento.text = telemetria.almacenamiento
+                     tvAlmacenamiento.setTextColor(Color.parseColor("#FFFFFF"))
+-                    // MODO ONLINE: Limpiamos el filtro para mostrar la SD Blanca y la Uchuva a color
+                     ivSdUchuva.clearColorFilter()
+ 
+                     if (videosPendientes > 0) {
+@@ -311,25 +327,24 @@
+                 }
+             } else {
+                 Handler(Looper.getMainLooper()).post {
+-                    // --- MODO OFFLINE (NARANJA/ROJO) ---
+                     tvEstadoConexion.text = "OFFLINE"
+                     tvEstadoConexion.setTextColor(Color.parseColor("#E57373"))
+-                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_naranja) // Regresa al SVG original
++                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_naranja)
+ 
+-                    // Batería apagada/gris
+                     tvBateria.text = "--"
+                     tvBateria.setTextColor(Color.parseColor("#8B949E"))
+-                    ivBateriaHoja.setColorFilter(Color.parseColor("#5D4037")) // Hoja en tono marrón/gris apagado
++                    ivBateriaHoja.setColorFilter(Color.parseColor("#5D4037"))
+ 
+                     tvAlmacenamiento.text = "--"
+                     tvAlmacenamiento.setTextColor(Color.parseColor("#8B949E"))
+-                    ivSdUchuva.setColorFilter(Color.parseColor("#5D4037"))// MODO OFFLINE: Aplicamos el filtro gris que aplasta los colores
++                    ivSdUchuva.setColorFilter(Color.parseColor("#5D4037"))
+                     tvVideosCola.text = "SIN RED"
+                     tvVideosCola.setTextColor(Color.parseColor("#FFB74D"))
+                 }
+             }
+         }
+     }
++
+     private fun ejecutarSincronizacionHTTP() {
+         val ipIngresada = etIpDron.text.toString().trim()
+         if (ipIngresada.isEmpty()) return

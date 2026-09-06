@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Heredamos de Material3.Dark para forzar el modo oscuro -->
+    <style name="Theme.UchuvaTwinApp" parent="Theme.Material3.Dark.NoActionBar">
+        <!-- Mapeo de colores principales -->
+        <item name="colorPrimary">@color/tech_primary</item>
+        <item name="colorOnPrimary">@color/tech_background</item>
+        <item name="colorSurface">@color/tech_surface</item>
+        <item name="colorOnSurface">@color/tech_text_high</item>
+        <item name="colorSurfaceVariant">@color/tech_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/tech_text_medium</item>
+        <item name="android:colorBackground">@color/tech_background</item>
+        <item name="colorOutline">@color/tech_outline</item>
+
+        <!-- Sobrescribimos la forma para que sea más industrial/hardware -->
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.Tech.Medium</item>
+    </style>
+
+    <!-- Estilo de bordes: 8dp para look de telemetría militar/industrial -->
+    <style name="ShapeAppearance.Tech.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerSize">8dp</item>
+    </style>
+</resources>

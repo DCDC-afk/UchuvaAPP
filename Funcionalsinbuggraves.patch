@@ -1,0 +1,21 @@
+Index: app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt b/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt
+--- a/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt
++++ b/app/src/main/java/com/example/uchuvatwinapp/DronActivity.kt	(date 1785438215080)
+@@ -254,8 +254,11 @@
+             val videos = carpeta.listFiles { f -> f.extension.lowercase() in listOf("mp4", "avi") } ?: emptyArray()
+             if (videos.isNotEmpty()) {
+                 val carpetaProcesada = File(directorioResultados, "${carpeta.name}_procesado")
++                // Se valida la existencia de la carpeta Y la presencia del marcador de finalización
++                val estaCompletado = carpetaProcesada.exists() && File(carpetaProcesada, ".completado").exists()
++
+                 carpetasList.add(
+-                    LoteProcesable(carpeta.name, carpeta, carpetaProcesada.exists(), videos.size)
++                    LoteProcesable(carpeta.name, carpeta, estaCompletado, videos.size)
+                 )
+             }
+         }

@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F1115"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- 1. LLAMADA AL MÓDULO DE TELEMETRÍA -->
+    <include
+        android:id="@+id/modulo_telemetria"
+        layout="@layout/dron_panel_telemetria" />
+
+    <!-- 2. CONTENEDOR PRINCIPAL: NAVEGACIÓN Y PANELES -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:weightSum="100">
+
+        <!-- NAVEGACIÓN IZQUIERDA -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="12dp"
+            android:layout_weight="20"
+            android:orientation="vertical">
+
+            <include layout="@layout/dron_panel_navegacion" />
+
+        </LinearLayout>
+
+        <!-- PANEL DERECHO DINÁMICO (TARJETA OUTLINED) -->
+        <com.google.android.material.card.MaterialCardView
+            style="?attr/materialCardViewOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="80"
+            app:cardBackgroundColor="#1A1D24"
+            app:cardElevation="0dp"
+            app:strokeColor="#2A2F3A"
+            app:strokeWidth="1dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="16dp">
+
+                <!-- VISTA 1: STREAM EN VIVO -->
+                <LinearLayout
+                    android:id="@+id/panelControl"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:visibility="visible">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="monospace"
+                        android:text="CANAL MULTISPECTRAL EN VIVO"
+                        android:textAppearance="?attr/textAppearanceLabelMedium"
+                        android:textColor="?attr/colorPrimary"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/tech_background"
+                        app:strokeColor="?attr/colorOutline"
+                        app:strokeWidth="1dp">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:fontFamily="monospace"
+                            android:text="[ TRANSMISIÓN DESDE EL DRON]"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
+                <!-- VISTA 2: DESCARGA Y SINCRONIZACIÓN OTOÑAL -->
+                <LinearLayout
+                    android:id="@+id/panelDescarga"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="monospace"
+                        android:letterSpacing="0.05"
+                        android:text="PANEL DE SINCRONIZACIÓN HTTP"
+                        android:textAppearance="?attr/textAppearanceLabelMedium"
+                        android:textColor="#D36D42"
+                        android:textStyle="bold" />
+
+                    <!-- Barra de Control IP + Botón Sincronizar Balanceados -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="IP del Dron"
+                            app:boxBackgroundColor="#171513"
+                            app:boxStrokeColor="#7A8B62"
+                            app:hintTextColor="#BCAAA4">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etIpDron"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="monospace"
+                                android:inputType="textUri"
+                                android:singleLine="true"
+                                android:textColor="#FFFFFF"
+                                android:textSize="13sp" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <!-- Botón en Tono Verde Olivo / Pastel estructurado -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSincronizarLotes"
+                            android:layout_width="wrap_content"
+                            android:layout_height="56dp"
+                            android:layout_marginStart="12dp"
+                            android:fontFamily="sans-serif-black"
+                            android:letterSpacing="0.05"
+                            android:text="⬇ SINCRONIZAR"
+                            android:textColor="#000000"
+                            android:textSize="11sp"
+                            app:backgroundTint="#D36D42"
+                            app:cornerRadius="12dp"
+                            app:elevation="2dp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.progressindicator.LinearProgressIndicator
+                        android:id="@+id/pbSincronizacion"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:indeterminate="true"
+                        android:visibility="gone"
+                        app:indicatorColor="#D36D42" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnVolverLotes"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="🔙 VOLVER A CARPETAS"
+                        android:textColor="#EF9A9A"
+                        android:textSize="11sp"
+                        android:visibility="gone" />
+
+                    <!-- RecyclerView donde se despliegan las carpetas con el nuevo formato -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvGestorArchivos"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:clipToPadding="false"
+                        android:paddingVertical="4dp"
+                        android:scrollbars="vertical" />
+                </LinearLayout>
+
+                <!-- VISTA 3: PROCESAMIENTO TFLITE -->
+                <LinearLayout
+                    android:id="@+id/panelProcesamiento"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="monospace"
+                        android:text="INFERENCIA DE RED NEURONAL"
+                        android:textAppearance="?attr/textAppearanceLabelMedium"
+                        android:textColor="#D36D42"
+                        android:letterSpacing="0.05"
+                        android:textStyle="bold" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvLotesProcesables"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:layout_marginBottom="12dp"
+                        android:clipToPadding="false"
+                        android:paddingVertical="4dp"
+                        android:scrollbars="vertical" />
+
+                    <LinearLayout
+                        android:id="@+id/panelProgresoLote"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:background="#171513"
+                        android:orientation="vertical"
+                        android:padding="12dp"
+                        android:visibility="gone">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/tvProgresoLote"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
+                            android:text="Procesando video 1 de X..."
+                            android:textColor="#BCAAA4"
+                            android:textSize="12sp" />
+
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/pbProcesamientoLote"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            app:indicatorColor="#D36D42" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnIniciarProcesamiento"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:enabled="false"
+                        android:fontFamily="sans-serif-black"
+                        android:letterSpacing="0.05"
+                        android:text="SELECCIONE UNA CARPETA"
+                        android:textSize="13sp"
+                        app:cornerRadius="12dp"
+                        app:backgroundTint="#2A2F3A"
+                        android:textColor="#8B949E" />
+                </LinearLayout>
+
+            </FrameLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</LinearLayout>
