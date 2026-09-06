@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -22,7 +24,10 @@ import android.widget.Toast
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -32,9 +37,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import java.io.File
+import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
-class DronActivity : ComponentActivity() {
+class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentationListener {
 
     private lateinit var cardControl: MaterialCardView
     private lateinit var cardDescarga: MaterialCardView
@@ -52,6 +58,11 @@ class DronActivity : ComponentActivity() {
     private lateinit var btnCamaraTablet: MaterialButton
     private var isCameraActive = false
     private var cameraProvider: ProcessCameraProvider? = null
+
+    // --- Pipeline de Inferencia YOLOv26 ---
+    private var instanceSegmentation: InstanceSegmentation? = null
+    private lateinit var drawImages: DrawImages
+    private val cameraExecutor = Executors.newSingleThreadExecutor()
 
     private lateinit var etIpDron: EditText
     private lateinit var btnSincronizarLotes: MaterialButton
@@ -123,12 +134,28 @@ class DronActivity : ComponentActivity() {
         panelDescarga = findViewById(R.id.panelDescarga)
         panelProcesamiento = findViewById(R.id.panelProcesamiento)
 
-        // Inicialización de componentes de video y cámara
         previewViewDron = findViewById(R.id.previewViewDron)
         ivOverlayDron = findViewById(R.id.ivOverlayDron)
         tvPlaceholderDron = findViewById(R.id.tvPlaceholderDron)
         btnVerDronRTMP = findViewById(R.id.btnVerDronRTMP)
         btnCamaraTablet = findViewById(R.id.btnCamaraTablet)
+
+        // Inicializar motor de dibujo
+        drawImages = DrawImages(applicationContext)
+
+        // Inicializar intérprete TFLite del modelo
+        try {
+            instanceSegmentation = InstanceSegmentation(
+                context = applicationContext,
+                modelPath = "model_uchuvas.tflite", // Ajusta al nombre exacto de tu archivo en assets
+                instanceSegmentationListener = this,
+                message = { msg ->
+                    runOnUiThread { Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show() }
+                }
+            )
+        } catch (e: Exception) {
+            Toast.makeText(this, "Aviso: Modelo no cargado: ${e.message}", Toast.LENGTH_LONG).show()
+        }
 
         etIpDron = findViewById(R.id.etIpDron)
         btnSincronizarLotes = findViewById(R.id.btnSincronizarLotes)
@@ -287,15 +314,15 @@ class DronActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         cameraProvider?.unbindAll()
+        cameraExecutor.shutdown()
+        instanceSegmentation?.close()
         handlerTelemetria.removeCallbacks(runnableTelemetria)
     }
 
     private fun toggleCamaraTablet() {
         if (isCameraActive) {
-            // 1. Apagamos y desvinculamos la cámara del ciclo de vida
             cameraProvider?.unbindAll()
 
-            // 2. Ocultamos la vista previa y limpiamos el overlay
             previewViewDron.visibility = View.INVISIBLE
             ivOverlayDron.visibility = View.INVISIBLE
             ivOverlayDron.setImageDrawable(null)
@@ -307,9 +334,9 @@ class DronActivity : ComponentActivity() {
 
             isCameraActive = false
         } else {
-            // 3. Preparamos la interfaz para arrancar de nuevo de forma limpia
-            tvPlaceholderDron.visibility = View.VISIBLE
-            previewViewDron.visibility = View.INVISIBLE
+            tvPlaceholderDron.visibility = View.GONE
+            previewViewDron.setBackgroundColor(Color.BLACK)
+            previewViewDron.visibility = View.VISIBLE
             ivOverlayDron.visibility = View.VISIBLE
 
             iniciarCamaraPreview()
@@ -327,15 +354,25 @@ class DronActivity : ComponentActivity() {
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewViewDron.surfaceProvider)
-            }
+            // 1. Caso de uso: Vista Previa
+            val preview = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .build().also {
+                    it.setSurfaceProvider(previewViewDron.surfaceProvider)
+                }
 
-            // Escuchamos el momento exacto en que el flujo emite el primer frame nuevo
+            // 2. Caso de uso: Extracción de Frames para YOLO (Pipeline Metodología Referencia)
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .build().also {
+                    it.setAnalyzer(cameraExecutor, FrameAnalyzer())
+                }
+
             previewViewDron.previewStreamState.observe(this) { state ->
-                if (state == PreviewView.StreamState.STREAMING && isCameraActive) {
-                    tvPlaceholderDron.visibility = View.INVISIBLE
-                    previewViewDron.visibility = View.VISIBLE
+                if (state == PreviewView.StreamState.STREAMING) {
+                    previewViewDron.setBackgroundColor(Color.TRANSPARENT)
                 }
             }
 
@@ -343,11 +380,64 @@ class DronActivity : ComponentActivity() {
 
             try {
                 cameraProvider?.unbindAll()
-                cameraProvider?.bindToLifecycle(this, cameraSelector, preview)
+                cameraProvider?.bindToLifecycle(this, cameraSelector, preview, imageAnalyzer)
             } catch (exc: Exception) {
                 Toast.makeText(this, "Fallo al vincular cámara: ${exc.message}", Toast.LENGTH_SHORT).show()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    // Analizador de fotogramas de CameraX
+// Analizador de fotogramas de CameraX
+    inner class FrameAnalyzer : ImageAnalysis.Analyzer {
+        override fun analyze(imageProxy: ImageProxy) {
+            // 1. Usar el método seguro nativo de CameraX que maneja el padding de hardware
+            val originalBitmap = imageProxy.toBitmap()
+
+            // 2. Rotar la imagen si el sensor de la tablet lo requiere
+            val matrix = Matrix().apply {
+                postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+            }
+
+            val rotatedBitmap = Bitmap.createBitmap(
+                originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height,
+                matrix, true
+            )
+
+            // 3. Inyectar el frame corregido al modelo TFLite
+            instanceSegmentation?.invoke(rotatedBitmap)
+
+            // 4. Liberar la memoria del fotograma
+            imageProxy.close()
+        }
+    }
+    override fun onDetect(
+        interfaceTime: Long,
+        results: List<SegmentationResult>,
+        preProcessTime: Long,
+        postProcessTime: Long
+    ) {
+        android.util.Log.d("YOLO_LIVE", "Detectados: ${results.size} objetos | Inferencia: ${interfaceTime}ms")
+        val overlayBitmap = drawImages.invoke(results)
+        runOnUiThread {
+            if (isCameraActive) {
+                ivOverlayDron.setImageBitmap(overlayBitmap)
+            }
+        }
+    }
+
+    override fun onEmpty() {
+        android.util.Log.d("YOLO_LIVE", "Frame procesado: 0 detecciones")
+        runOnUiThread {
+            ivOverlayDron.setImageDrawable(null)
+        }
+    }
+
+    override fun onError(error: String) {
+        android.util.Log.e("YOLO_LIVE", "Error en inferencia: $error")
+        runOnUiThread {
+            ivOverlayDron.setImageDrawable(null)
+        }
     }
     private fun cargarCarpetasParaProcesar() {
         val carpetasOrigen = GestorLotes.listarLotesExistentes(this)
@@ -575,7 +665,6 @@ class DronActivity : ComponentActivity() {
     }
 
     private fun cambiarModo(modo: Int) {
-        // Pausar cámara si salimos del modo Enlace y Control
         if (modo != 1 && isCameraActive) {
             toggleCamaraTablet()
         }

@@ -5,16 +5,12 @@ plugins {
 
 android {
     namespace = "com.example.uchuvatwinapp"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.uchuvatwinapp"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -58,18 +54,25 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
     // Librería para leer e interpretar el JSON
     implementation("com.google.code.gson:gson:2.14.0")
-    // Librerías para ejecutar el modelo TensorFlow Lite / LiteRT
-    implementation("com.google.ai.edge.litert:litert:1.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Módulos locales y herramientas
     implementation(project(":opencv"))
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-free-81:8.1.7")
     implementation("com.google.android.material:material:1.11.0")
+
     // CameraX para captura y análisis en vivo
     val cameraxVersion = "1.4.1"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // TensorFlow Lite e Instance Segmentation
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-metadata:0.1.0-rc1")
 }
