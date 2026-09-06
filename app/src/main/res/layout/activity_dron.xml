@@ -56,15 +56,51 @@
                     android:orientation="vertical"
                     android:visibility="visible">
 
-                    <com.google.android.material.textview.MaterialTextView
-                        android:layout_width="wrap_content"
+                    <!-- HEADER MINIMALISTA: TÍTULO Y SWITCH SUPERIOR DERECHO -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
-                        android:fontFamily="monospace"
-                        android:text="CANAL MULTISPECTRAL EN VIVO"
-                        android:textAppearance="?attr/textAppearanceLabelMedium"
-                        android:textColor="#D36D42"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="monospace"
+                            android:text="CANAL MULTISPECTRAL EN VIVO"
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="#D36D42"
+                            android:textStyle="bold" />
+
+                        <!-- Ícono Cuadro (Detección de Objetos) -->
+                        <TextView
+                            android:id="@+id/tvIconoDetect"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="□"
+                            android:textColor="#B5EC73"
+                            android:textSize="26sp"
+                            android:textStyle="bold" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchModeloIA"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="10dp"
+                            app:thumbTint="#B5EC73"
+                            app:trackTint="#2A2F3A" />
+
+                        <!-- Ícono Círculo Relleno (Segmentación) -->
+                        <TextView
+                            android:id="@+id/tvIconoSeg"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="●"
+                            android:textColor="#8B949E"
+                            android:textSize="20sp" />
+                    </LinearLayout>
 
                     <!-- Contenedor de Video y Superposición -->
                     <com.google.android.material.card.MaterialCardView
@@ -79,14 +115,12 @@
                             android:layout_width="match_parent"
                             android:layout_height="match_parent">
 
-                            <!-- Vista previa de la cámara -->
                             <androidx.camera.view.PreviewView
                                 android:id="@+id/previewViewDron"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
                                 android:visibility="invisible" />
 
-                            <!-- Capa para dibujar las máscaras y detecciones de YOLO -->
                             <ImageView
                                 android:id="@+id/ivOverlayDron"
                                 android:layout_width="match_parent"

@@ -9,10 +9,10 @@ import android.graphics.Rect
 
 class DrawImages(private val context: Context) {
 
-    // Asignación cromática solicitada: Maduro -> Morado, Inmaduro -> Verde
-    private val colorMaduro = Color.parseColor("#AB47BC")   // Morado vibrante
-    private val colorInmaduro = Color.parseColor("#4CAF50") // Verde nítido
-    private val colorDefault = Color.parseColor("#D36D42")  // Naranja uchuva
+    private val colorMaduro = Color.parseColor("#AB47BC")
+    private val colorInmaduro = Color.parseColor("#4CAF50")
+    private val colorArucoVerde = Color.parseColor("#B5EC73") // Verde pastel vibrante
+    private val colorDefault = Color.parseColor("#D36D42")
 
     fun invoke(results: List<SegmentationResult>, frameWidth: Int, frameHeight: Int): Bitmap {
         val combined = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
@@ -22,6 +22,7 @@ class DrawImages(private val context: Context) {
             val colorCaja = when (result.box.clsName.lowercase()) {
                 "maduro" -> colorMaduro
                 "inmaduro" -> colorInmaduro
+                "uchuva", "capacho" -> colorArucoVerde
                 else -> colorDefault
             }
             dibujarCaja(canvas, frameWidth, frameHeight, result.box, colorCaja)
@@ -36,7 +37,6 @@ class DrawImages(private val context: Context) {
         box: Output0,
         colorCaja: Int
     ) {
-        // Trazo fino y preciso
         val boxPaint = Paint().apply {
             color = colorCaja
             strokeWidth = 2.5F
@@ -51,9 +51,11 @@ class DrawImages(private val context: Context) {
 
         canvas.drawRect(left, top, right, bottom, boxPaint)
 
-        // Tipografía compacta y legible
+        // Usar texto negro si el color de la caja es el verde claro de Aruco
+        val textColor = if (colorCaja == colorArucoVerde) Color.BLACK else Color.WHITE
+
         val textPaint = Paint().apply {
-            color = Color.WHITE
+            color = textColor
             style = Paint.Style.FILL
             textSize = 13f
             isAntiAlias = true
@@ -77,7 +79,6 @@ class DrawImages(private val context: Context) {
         val padH = 4f
         val padV = 2f
 
-        // Pastilla superior compacta pegada a la esquina superior izquierda
         val badgeLeft = left
         val badgeBottom = top
         val badgeTop = top - textHeight - (padV * 2)
