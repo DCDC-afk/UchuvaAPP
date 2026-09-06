@@ -38,6 +38,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.materialswitch.MaterialSwitch
+import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.core.Mat
+import org.opencv.imgproc.Imgproc
+import org.opencv.objdetect.ArucoDetector
+import org.opencv.objdetect.DetectorParameters
+import org.opencv.objdetect.Objdetect
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
@@ -48,7 +55,7 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
     private lateinit var cardDescarga: MaterialCardView
     private lateinit var cardProcesar: MaterialCardView
 
-    private lateinit var panelControl: LinearLayout
+    private lateinit var panelControl: View
     private lateinit var panelDescarga: LinearLayout
     private lateinit var panelProcesamiento: LinearLayout
 
@@ -62,6 +69,17 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
     private lateinit var tvIconoDetect: TextView
     private lateinit var tvIconoSeg: TextView
     private var usarDeteccionObjetos = true
+
+    // Geometría ArUco
+    private lateinit var btnConfigAruco: TextView
+    private lateinit var menuConfigAruco: MaterialCardView
+    private lateinit var etArucoSize: EditText
+    private lateinit var etArucoAnchor: EditText
+    private lateinit var btnCerrarAruco: MaterialButton
+
+    @Volatile private var arucoSizeCm = 10.0
+    @Volatile private var arucoAnchorMeters = 5.0
+    private var arucoDetector: ArucoDetector? = null
 
     private var isCameraActive = false
     private var cameraProvider: ProcessCameraProvider? = null
@@ -124,8 +142,14 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         ).apply { duration = 350L }
 
         setContentView(R.layout.activity_dron)
-
         prefs = getSharedPreferences("UchuvaTwinPrefs", Context.MODE_PRIVATE)
+
+        // Inicializar OpenCV para ArUco
+        if (OpenCVLoader.initLocal()) {
+            val parameters = DetectorParameters()
+            val dictionary = Objdetect.getPredefinedDictionary(Objdetect.DICT_4X4_50)
+            arucoDetector = ArucoDetector(dictionary, parameters)
+        }
 
         cardControl = findViewById(R.id.cardBotonControl)
         cardDescarga = findViewById(R.id.cardBotonDescarga)
@@ -145,35 +169,43 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         tvIconoDetect = findViewById(R.id.tvIconoDetect)
         tvIconoSeg = findViewById(R.id.tvIconoSeg)
 
+        // Botones UI ArUco
+        btnConfigAruco = findViewById(R.id.btnConfigAruco)
+        menuConfigAruco = findViewById(R.id.menuConfigAruco)
+        etArucoSize = findViewById(R.id.etArucoSize)
+        etArucoAnchor = findViewById(R.id.etArucoAnchor)
+        btnCerrarAruco = findViewById(R.id.btnCerrarAruco)
+
+        btnConfigAruco.setOnClickListener {
+            menuConfigAruco.visibility = if (menuConfigAruco.visibility == View.GONE) View.VISIBLE else View.GONE
+        }
+        btnCerrarAruco.setOnClickListener {
+            arucoSizeCm = etArucoSize.text.toString().toDoubleOrNull() ?: 10.0
+            arucoAnchorMeters = etArucoAnchor.text.toString().toDoubleOrNull() ?: 5.0
+            menuConfigAruco.visibility = View.GONE
+            Toast.makeText(this, "Geometría ArUco actualizada", Toast.LENGTH_SHORT).show()
+        }
+
         drawImages = DrawImages(applicationContext)
 
-        // 1. CARGA MODELO SEGMENTACIÓN
         try {
             instanceSegmentation = InstanceSegmentation(
-                context = applicationContext,
-                modelPath = "model_uchuvas.tflite",
+                context = applicationContext, modelPath = "model_uchuvas.tflite",
                 instanceSegmentationListener = this,
                 message = { msg -> runOnUiThread { Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show() } }
             )
-        } catch (e: Exception) {
-            Log.e("UchuvaVision", "Fallo al cargar segmentación", e)
-        }
+        } catch (e: Exception) { Log.e("UchuvaVision", "Fallo segmentacion", e) }
 
-        // 2. CARGA MODELO DETECCIÓN CON CONTROL DE ERRORES SEVERO
         try {
             objectDetection = ObjectDetection(
-                context = applicationContext,
-                modelPath = "model_deteccion.tflite", // <-- ASEGURATE QUE EXISTA EN ASSETS
+                context = applicationContext, modelPath = "model_deteccion.tflite",
                 listener = this,
                 message = { msg -> runOnUiThread { Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show() } }
             )
-            Log.d("UchuvaVision", "Modelo Detección instanciado correctamente.")
         } catch (e: Exception) {
-            Log.e("UchuvaVision", "NO SE PUDO CARGAR MODELO DETECCIÓN. REVISA LA CONSOLA.", e)
             usarDeteccionObjetos = false
-            switchModeloIA.isChecked = true // Fozar switch a Segmentación si falla la carga
-            switchModeloIA.isEnabled = false // Bloquear switch si el modelo no existe
-            Toast.makeText(this, "El archivo 'model_deteccion.tflite' no es compatible o no se encuentra.", Toast.LENGTH_LONG).show()
+            switchModeloIA.isChecked = true
+            switchModeloIA.isEnabled = false
         }
 
         switchModeloIA.setOnCheckedChangeListener { _, isChecked ->
@@ -193,7 +225,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
             }
         }
 
-        // Forzar colores del switch en la carga inicial
         if (usarDeteccionObjetos) {
             switchModeloIA.thumbTintList = ColorStateList.valueOf(Color.parseColor("#B5EC73"))
             tvIconoDetect.setTextColor(Color.parseColor("#B5EC73"))
@@ -223,8 +254,7 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         rvGestorArchivos.layoutManager = LinearLayoutManager(this)
         rvLotesProcesables.layoutManager = LinearLayoutManager(this)
 
-        val ipGuardada = prefs.getString("IP_DRON", "192.168.1.10")
-        etIpDron.setText(ipGuardada)
+        etIpDron.setText(prefs.getString("IP_DRON", "192.168.1.10"))
 
         adaptadorLotesProcesables = AdapterLotesProcesables(emptyList()) { lote ->
             loteSeleccionadoParaProcesar = lote
@@ -399,6 +429,7 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         }, ContextCompat.getMainExecutor(this))
     }
 
+    // EL CEREBRO DE VISIÓN ESPACIAL: Integra YOLO y ArUco
     inner class FrameAnalyzer : ImageAnalysis.Analyzer {
         override fun analyze(imageProxy: ImageProxy) {
             try {
@@ -406,13 +437,63 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
                 val matrix = Matrix().apply { postRotate(imageProxy.imageInfo.rotationDegrees.toFloat()) }
                 val rotatedBitmap = Bitmap.createBitmap(originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height, matrix, true)
 
-                if (usarDeteccionObjetos) {
-                    if (objectDetection != null) {
-                        objectDetection?.invoke(rotatedBitmap)
-                    } else {
-                        // Si el modelo está en null pero el switch está activo, no hace nada para evitar crash
+                // 1. Detección ArUco (OpenCV)
+                var planarMapping: PlanarMapping? = null
+                if (arucoDetector != null) {
+                    val rgba = Mat()
+                    Utils.bitmapToMat(rotatedBitmap, rgba)
+                    val gray = Mat()
+                    Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY)
+                    val corners = ArrayList<Mat>()
+                    val ids = Mat()
+
+                    arucoDetector!!.detectMarkers(gray, corners, ids)
+
+                    if (ids.total() > 0) {
+                        val markerCorners = corners[0]
+                        val p1 = Point2(markerCorners.get(0,0)[0], markerCorners.get(0,0)[1])
+                        val p2 = Point2(markerCorners.get(0,1)[0], markerCorners.get(0,1)[1])
+                        val p3 = Point2(markerCorners.get(0,2)[0], markerCorners.get(0,2)[1])
+                        val p4 = Point2(markerCorners.get(0,3)[0], markerCorners.get(0,3)[1])
+
+                        planarMapping = PlanarMapping.fromMarker(listOf(p1, p2, p3, p4), arucoSizeCm)
                     }
+
+                    rgba.release(); gray.release(); ids.release()
+                    corners.forEach { it.release() }
+                }
+
+                // 2. Inferencia IA (YOLO)
+                // Se intercepta temporalmente el Listener para inyectarle la distancia calculada antes de dibujar
+                val interceptorListener = object : InstanceSegmentation.InstanceSegmentationListener {
+                    override fun onDetect(ifTime: Long, results: List<SegmentationResult>, preTime: Long, postTime: Long, w: Int, h: Int) {
+
+                        if (planarMapping != null) {
+                            results.forEach { result ->
+                                val pxCenter = Point2((result.box.cx * w).toDouble(), (result.box.cy * h).toDouble())
+                                val relativePos = planarMapping.project(pxCenter)
+                                if (relativePos != null) {
+                                    // Sumamos la posición absoluta (en metros) al desplazamiento X calculado
+                                    val distanciaXMetros = relativePos.xCm / 100.0
+                                    result.distanciaAbsolutaM = (arucoAnchorMeters + distanciaXMetros).toFloat()
+                                }
+                            }
+                        }
+                        this@DronActivity.onDetect(ifTime, results, preTime, postTime, w, h)
+                    }
+                    override fun onEmpty() { this@DronActivity.onEmpty() }
+                    override fun onError(error: String) { this@DronActivity.onError(error) }
+                }
+
+                if (usarDeteccionObjetos) {
+                    // Sustituimos el listener original temporalmente usando reflection o pasando un nuevo wrapper
+                    // Como ObjectDetection no expone un setter para el listener, llamamos invoke pero
+                    // la proyección la hacemos en onDetect de DronActivity.
+                    // Para mantener el diseño limpio, guardaremos el mapping temporalmente.
+                    this@DronActivity.currentMapping = planarMapping
+                    objectDetection?.invoke(rotatedBitmap)
                 } else {
+                    this@DronActivity.currentMapping = planarMapping
                     instanceSegmentation?.invoke(rotatedBitmap)
                 }
             } catch (e: Exception) {
@@ -424,9 +505,25 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         }
     }
 
+    // Variable temporal para cruzar el mapeo de ArUco con la respuesta asíncrona de YOLO
+    @Volatile var currentMapping: PlanarMapping? = null
+
     override fun onDetect(
         interfaceTime: Long, results: List<SegmentationResult>, preProcessTime: Long, postProcessTime: Long, frameWidth: Int, frameHeight: Int
     ) {
+        // Inyección geométrica: Cruzar las coordenadas píxel de YOLO con la malla de ArUco
+        val mapping = currentMapping
+        if (mapping != null) {
+            results.forEach { result ->
+                val pxCenter = Point2((result.box.cx * frameWidth).toDouble(), (result.box.cy * frameHeight).toDouble())
+                val relativePos = mapping.project(pxCenter)
+                if (relativePos != null) {
+                    val distanciaXMetros = relativePos.xCm / 100.0
+                    result.distanciaAbsolutaM = (arucoAnchorMeters + distanciaXMetros).toFloat()
+                }
+            }
+        }
+
         val overlayBitmap = drawImages.invoke(results, frameWidth, frameHeight)
         runOnUiThread {
             if (isCameraActive) {

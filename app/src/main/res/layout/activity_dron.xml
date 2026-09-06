@@ -49,135 +49,218 @@
                 android:padding="16dp">
 
                 <!-- VISTA 1: STREAM EN VIVO -->
-                <LinearLayout
+                <FrameLayout
                     android:id="@+id/panelControl"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="vertical"
                     android:visibility="visible">
 
-                    <!-- HEADER MINIMALISTA: TÍTULO Y SWITCH SUPERIOR DERECHO -->
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:layout_height="match_parent"
+                        android:orientation="vertical">
 
-                        <com.google.android.material.textview.MaterialTextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:fontFamily="monospace"
-                            android:text="CANAL MULTISPECTRAL EN VIVO"
-                            android:textAppearance="?attr/textAppearanceLabelMedium"
-                            android:textColor="#D36D42"
-                            android:textStyle="bold" />
-
-                        <!-- Ícono Cuadro (Detección de Objetos) -->
-                        <TextView
-                            android:id="@+id/tvIconoDetect"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="□"
-                            android:textColor="#B5EC73"
-                            android:textSize="26sp"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/switchModeloIA"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginHorizontal="10dp"
-                            app:thumbTint="#B5EC73"
-                            app:trackTint="#2A2F3A" />
-
-                        <!-- Ícono Círculo Relleno (Segmentación) -->
-                        <TextView
-                            android:id="@+id/tvIconoSeg"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="●"
-                            android:textColor="#8B949E"
-                            android:textSize="20sp" />
-                    </LinearLayout>
-
-                    <!-- Contenedor de Video y Superposición -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="@color/tech_background"
-                        app:strokeColor="?attr/colorOutline"
-                        app:strokeWidth="1dp">
-
-                        <FrameLayout
+                        <!-- HEADER MINIMALISTA CON ARUCO -->
+                        <LinearLayout
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent">
-
-                            <androidx.camera.view.PreviewView
-                                android:id="@+id/previewViewDron"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:visibility="invisible" />
-
-                            <ImageView
-                                android:id="@+id/ivOverlayDron"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:visibility="invisible" />
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="12dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
                             <com.google.android.material.textview.MaterialTextView
-                                android:id="@+id/tvPlaceholderDron"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="monospace"
+                                android:text="CANAL MULTISPECTRAL EN VIVO"
+                                android:textAppearance="?attr/textAppearanceLabelMedium"
+                                android:textColor="#D36D42"
+                                android:textStyle="bold" />
+
+                            <!-- Ícono Configuración ArUco -->
+                            <TextView
+                                android:id="@+id/btnConfigAruco"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_gravity="center"
-                                android:fontFamily="monospace"
-                                android:text="[ TRANSMISIÓN DESDE EL DRON ]"
-                                android:textAppearance="?attr/textAppearanceBodyMedium"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-                        </FrameLayout>
-                    </com.google.android.material.card.MaterialCardView>
+                                android:layout_marginEnd="16dp"
+                                android:text="🔳"
+                                android:textColor="#BCAAA4"
+                                android:textSize="22sp"
+                                android:clickable="true"
+                                android:focusable="true"/>
 
-                    <!-- Botones de Control Inferiores -->
-                    <LinearLayout
+                            <TextView
+                                android:id="@+id/tvIconoDetect"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="□"
+                                android:textColor="#B5EC73"
+                                android:textSize="26sp"
+                                android:textStyle="bold" />
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/switchModeloIA"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginHorizontal="10dp"
+                                app:thumbTint="#B5EC73"
+                                app:trackTint="#2A2F3A" />
+
+                            <TextView
+                                android:id="@+id/tvIconoSeg"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="●"
+                                android:textColor="#8B949E"
+                                android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <!-- Contenedor de Video -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1"
+                            app:cardBackgroundColor="@color/tech_background"
+                            app:strokeColor="?attr/colorOutline"
+                            app:strokeWidth="1dp">
+
+                            <FrameLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent">
+
+                                <androidx.camera.view.PreviewView
+                                    android:id="@+id/previewViewDron"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:visibility="invisible" />
+
+                                <ImageView
+                                    android:id="@+id/ivOverlayDron"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:visibility="invisible" />
+
+                                <com.google.android.material.textview.MaterialTextView
+                                    android:id="@+id/tvPlaceholderDron"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="center"
+                                    android:fontFamily="monospace"
+                                    android:text="[ TRANSMISIÓN DESDE EL DRON ]"
+                                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+                            </FrameLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="horizontal"
+                            android:weightSum="2">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnVerDronRTMP"
+                                android:layout_width="0dp"
+                                android:layout_height="54dp"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:fontFamily="monospace"
+                                android:text="VER DRON (RTMP)"
+                                android:textColor="#000000"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                app:backgroundTint="#D36D42"
+                                app:cornerRadius="8dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnCamaraTablet"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="54dp"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:fontFamily="monospace"
+                                android:text="CÁMARA TABLET"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                app:cornerRadius="8dp"
+                                app:strokeColor="#2A2F3A"
+                                app:strokeWidth="1.5dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- MENÚ FLOTANTE ARUCO (Oculto por defecto) -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/menuConfigAruco"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:orientation="horizontal"
-                        android:weightSum="2">
+                        android:layout_gravity="bottom"
+                        android:layout_marginBottom="70dp"
+                        android:layout_marginHorizontal="20dp"
+                        android:visibility="gone"
+                        app:cardBackgroundColor="#CC1A1D24"
+                        app:cardElevation="8dp"
+                        app:strokeColor="#4CAF50"
+                        app:strokeWidth="1dp">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnVerDronRTMP"
-                            android:layout_width="0dp"
-                            android:layout_height="54dp"
-                            android:layout_marginEnd="6dp"
-                            android:layout_weight="1"
-                            android:fontFamily="monospace"
-                            android:text="VER DRON (RTMP)"
-                            android:textColor="#000000"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            app:backgroundTint="#D36D42"
-                            app:cornerRadius="8dp" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnCamaraTablet"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="54dp"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            android:fontFamily="monospace"
-                            android:text="CÁMARA TABLET"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            app:cornerRadius="8dp"
-                            app:strokeColor="#2A2F3A"
-                            app:strokeWidth="1.5dp" />
-                    </LinearLayout>
-                </LinearLayout>
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="GEOMETRÍA ARUCO"
+                                android:textColor="#4CAF50"
+                                android:textStyle="bold"
+                                android:fontFamily="monospace"/>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:orientation="horizontal">
+                                <EditText
+                                    android:id="@+id/etArucoSize"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:hint="Lado (cm)"
+                                    android:text="10.0"
+                                    android:textColor="#FFF"
+                                    android:textColorHint="#8B949E"
+                                    android:inputType="numberDecimal"
+                                    android:textSize="14sp"/>
+                                <EditText
+                                    android:id="@+id/etArucoAnchor"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="8dp"
+                                    android:hint="Ancla Absoluta (m)"
+                                    android:text="5.0"
+                                    android:textColor="#FFF"
+                                    android:textColorHint="#8B949E"
+                                    android:inputType="numberDecimal"
+                                    android:textSize="14sp"/>
+                            </LinearLayout>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnCerrarAruco"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="GUARDAR Y CERRAR"
+                                app:backgroundTint="#2A2F3A"
+                                android:textColor="#FFF"/>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </FrameLayout>
 
                 <!-- VISTA 2: DESCARGA Y SINCRONIZACIÓN OTOÑAL -->
                 <LinearLayout
