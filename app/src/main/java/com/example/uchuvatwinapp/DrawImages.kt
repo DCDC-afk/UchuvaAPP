@@ -5,86 +5,85 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import androidx.core.content.ContextCompat
+import android.graphics.Rect
 
 class DrawImages(private val context: Context) {
 
-    private val boxColors = listOf(
-        R.color.overlay_orange,
-        R.color.overlay_blue,
-        R.color.overlay_green,
-        R.color.overlay_red,
-        R.color.overlay_pink,
-        R.color.overlay_cyan,
-        R.color.overlay_purple,
-        R.color.overlay_gray,
-        R.color.overlay_teal,
-        R.color.overlay_yellow,
-    )
+    // Asignación cromática solicitada: Maduro -> Morado, Inmaduro -> Verde
+    private val colorMaduro = Color.parseColor("#AB47BC")   // Morado vibrante
+    private val colorInmaduro = Color.parseColor("#4CAF50") // Verde nítido
+    private val colorDefault = Color.parseColor("#D36D42")  // Naranja uchuva
 
-    fun invoke(results: List<SegmentationResult>) : Bitmap {
-        // Obtenemos el ancho y alto a partir de la resolución de la pantalla de la tablet (el frame original)
-        // Ya no leemos desde la máscara
-        val width = 640 // Si necesitas que el overlay escale a pantalla completa dinámicamente,
-        val height = 480 // este canvas será ajustado por el ScaleType del ImageView
-
-        val combined = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    fun invoke(results: List<SegmentationResult>, frameWidth: Int, frameHeight: Int): Bitmap {
+        val combined = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(combined)
 
         results.forEach { result ->
-            val colorResId = boxColors[result.box.cls % 10]
-            dibujarCaja(context, canvas, width, height, result.box, colorResId)
+            val colorCaja = when (result.box.clsName.lowercase()) {
+                "maduro" -> colorMaduro
+                "inmaduro" -> colorInmaduro
+                else -> colorDefault
+            }
+            dibujarCaja(canvas, frameWidth, frameHeight, result.box, colorCaja)
         }
         return combined
     }
 
-    private fun dibujarCaja(context: Context, canvas: Canvas, width: Int, height: Int, box: Output0, overlayColorResId: Int) {
-        val overlayColor = ContextCompat.getColor(context, overlayColorResId)
-
+    private fun dibujarCaja(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        box: Output0,
+        colorCaja: Int
+    ) {
+        // Trazo fino y preciso
         val boxPaint = Paint().apply {
-            color = overlayColor
-            strokeWidth = 4F
+            color = colorCaja
+            strokeWidth = 2.5F
             style = Paint.Style.STROKE
-        }
-
-        val left = (box.x1 * width).toInt()
-        val top = (box.y1 * height).toInt()
-        val right = (box.x2 * width).toInt()
-        val bottom = (box.y2 * height).toInt()
-
-        canvas.drawRect(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat(), boxPaint)
-
-        val textBackgroundPaint = Paint().apply {
-            color = overlayColor
-            style = Paint.Style.FILL
-        }
-
-        val textPaint = Paint().apply {
-            color = Color.WHITE
-            style = Paint.Style.FILL
-            textSize = 14f
             isAntiAlias = true
         }
 
-        // Formatear el texto de etiqueta + confianza (Ej: "Maduro 89%")
+        val left = box.x1 * width
+        val top = box.y1 * height
+        val right = box.x2 * width
+        val bottom = box.y2 * height
+
+        canvas.drawRect(left, top, right, bottom, boxPaint)
+
+        // Tipografía compacta y legible
+        val textPaint = Paint().apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+            textSize = 13f
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+
+        val textBackgroundPaint = Paint().apply {
+            color = colorCaja
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
         val porcentajeConfianza = (box.cnf * 100).toInt()
         val labelText = "${box.clsName} $porcentajeConfianza%"
 
-        val bounds = android.graphics.Rect()
+        val bounds = Rect()
         textPaint.getTextBounds(labelText, 0, labelText.length, bounds)
 
         val textWidth = bounds.width()
         val textHeight = bounds.height()
-        val padding = 4
+        val padH = 4f
+        val padV = 2f
 
-        canvas.drawRect(
-            left.toFloat() - 2, // Ajuste para que se solape perfecto con el borde izquierdo
-            top.toFloat() - textHeight - 2 * padding,
-            left.toFloat() + textWidth + 2 * padding.toFloat(),
-            top.toFloat(),
-            textBackgroundPaint
-        )
+        // Pastilla superior compacta pegada a la esquina superior izquierda
+        val badgeLeft = left
+        val badgeBottom = top
+        val badgeTop = top - textHeight - (padV * 2)
+        val badgeRight = left + textWidth + (padH * 2)
 
-        canvas.drawText(labelText, left.toFloat() + padding, top.toFloat() - padding.toFloat(), textPaint)
+        canvas.drawRect(badgeLeft, badgeTop, badgeRight, badgeBottom, textBackgroundPaint)
+        canvas.drawText(labelText, badgeLeft + padH, badgeBottom - padV - 1f, textPaint)
     }
 }

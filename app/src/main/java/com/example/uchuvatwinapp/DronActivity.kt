@@ -415,26 +415,27 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         interfaceTime: Long,
         results: List<SegmentationResult>,
         preProcessTime: Long,
-        postProcessTime: Long
+        postProcessTime: Long,
+        frameWidth: Int,
+        frameHeight: Int
     ) {
-        android.util.Log.d("YOLO_LIVE", "Detectados: ${results.size} objetos | Inferencia: ${interfaceTime}ms")
-        val overlayBitmap = drawImages.invoke(results)
+        val overlayBitmap = drawImages.invoke(results, frameWidth, frameHeight)
         runOnUiThread {
             if (isCameraActive) {
+                // Obligamos al ImageView a escalar y recortar la capa de dibujo igual que el PreviewView de CameraX
+                ivOverlayDron.scaleType = ImageView.ScaleType.CENTER_CROP
                 ivOverlayDron.setImageBitmap(overlayBitmap)
             }
         }
     }
 
     override fun onEmpty() {
-        android.util.Log.d("YOLO_LIVE", "Frame procesado: 0 detecciones")
         runOnUiThread {
             ivOverlayDron.setImageDrawable(null)
         }
     }
 
     override fun onError(error: String) {
-        android.util.Log.e("YOLO_LIVE", "Error en inferencia: $error")
         runOnUiThread {
             ivOverlayDron.setImageDrawable(null)
         }
