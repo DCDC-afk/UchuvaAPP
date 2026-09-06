@@ -1,8 +1,10 @@
 package com.example.uchuvatwinapp
 
+import android.Manifest
 import android.app.Dialog
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.net.Uri
@@ -19,6 +21,12 @@ import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -35,6 +43,15 @@ class DronActivity : ComponentActivity() {
     private lateinit var panelControl: LinearLayout
     private lateinit var panelDescarga: LinearLayout
     private lateinit var panelProcesamiento: LinearLayout
+
+    // --- Elementos de Cámara y Enlace ---
+    private lateinit var previewViewDron: PreviewView
+    private lateinit var ivOverlayDron: ImageView
+    private lateinit var tvPlaceholderDron: TextView
+    private lateinit var btnVerDronRTMP: MaterialButton
+    private lateinit var btnCamaraTablet: MaterialButton
+    private var isCameraActive = false
+    private var cameraProvider: ProcessCameraProvider? = null
 
     private lateinit var etIpDron: EditText
     private lateinit var btnSincronizarLotes: MaterialButton
@@ -73,6 +90,16 @@ class DronActivity : ComponentActivity() {
         }
     }
 
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            toggleCamaraTablet()
+        } else {
+            Toast.makeText(this, "Permiso de cámara requerido", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -95,6 +122,13 @@ class DronActivity : ComponentActivity() {
         panelControl = findViewById(R.id.panelControl)
         panelDescarga = findViewById(R.id.panelDescarga)
         panelProcesamiento = findViewById(R.id.panelProcesamiento)
+
+        // Inicialización de componentes de video y cámara
+        previewViewDron = findViewById(R.id.previewViewDron)
+        ivOverlayDron = findViewById(R.id.ivOverlayDron)
+        tvPlaceholderDron = findViewById(R.id.tvPlaceholderDron)
+        btnVerDronRTMP = findViewById(R.id.btnVerDronRTMP)
+        btnCamaraTablet = findViewById(R.id.btnCamaraTablet)
 
         etIpDron = findViewById(R.id.etIpDron)
         btnSincronizarLotes = findViewById(R.id.btnSincronizarLotes)
@@ -151,6 +185,18 @@ class DronActivity : ComponentActivity() {
         btnSincronizarLotes.setOnClickListener { ejecutarSincronizacionHTTP() }
         btnVolverLotes.setOnClickListener { cargarLotesLocalesEnUI() }
         btnIniciarProcesamiento.setOnClickListener { iniciarProcesamientoMasivo() }
+
+        btnCamaraTablet.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                toggleCamaraTablet()
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+
+        btnVerDronRTMP.setOnClickListener {
+            Toast.makeText(this, "Conectando al stream RTMP del dron...", Toast.LENGTH_SHORT).show()
+        }
 
         ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_naranja)
 
@@ -240,9 +286,69 @@ class DronActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        cameraProvider?.unbindAll()
         handlerTelemetria.removeCallbacks(runnableTelemetria)
     }
 
+    private fun toggleCamaraTablet() {
+        if (isCameraActive) {
+            // 1. Apagamos y desvinculamos la cámara del ciclo de vida
+            cameraProvider?.unbindAll()
+
+            // 2. Ocultamos la vista previa y limpiamos el overlay
+            previewViewDron.visibility = View.INVISIBLE
+            ivOverlayDron.visibility = View.INVISIBLE
+            ivOverlayDron.setImageDrawable(null)
+            tvPlaceholderDron.visibility = View.VISIBLE
+
+            btnCamaraTablet.text = "CÁMARA TABLET"
+            btnCamaraTablet.strokeColor = ColorStateList.valueOf(Color.parseColor("#2A2F3A"))
+            btnCamaraTablet.setTextColor(Color.WHITE)
+
+            isCameraActive = false
+        } else {
+            // 3. Preparamos la interfaz para arrancar de nuevo de forma limpia
+            tvPlaceholderDron.visibility = View.VISIBLE
+            previewViewDron.visibility = View.INVISIBLE
+            ivOverlayDron.visibility = View.VISIBLE
+
+            iniciarCamaraPreview()
+
+            btnCamaraTablet.text = "PAUSAR CÁMARA"
+            btnCamaraTablet.strokeColor = ColorStateList.valueOf(Color.parseColor("#D36D42"))
+            btnCamaraTablet.setTextColor(Color.parseColor("#D36D42"))
+
+            isCameraActive = true
+        }
+    }
+
+    private fun iniciarCamaraPreview() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            cameraProvider = cameraProviderFuture.get()
+
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewViewDron.surfaceProvider)
+            }
+
+            // Escuchamos el momento exacto en que el flujo emite el primer frame nuevo
+            previewViewDron.previewStreamState.observe(this) { state ->
+                if (state == PreviewView.StreamState.STREAMING && isCameraActive) {
+                    tvPlaceholderDron.visibility = View.INVISIBLE
+                    previewViewDron.visibility = View.VISIBLE
+                }
+            }
+
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                cameraProvider?.unbindAll()
+                cameraProvider?.bindToLifecycle(this, cameraSelector, preview)
+            } catch (exc: Exception) {
+                Toast.makeText(this, "Fallo al vincular cámara: ${exc.message}", Toast.LENGTH_SHORT).show()
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
     private fun cargarCarpetasParaProcesar() {
         val carpetasOrigen = GestorLotes.listarLotesExistentes(this)
         val directorioResultados = File(getExternalFilesDir(null), "UchuvaTwin_Resultados")
@@ -256,7 +362,6 @@ class DronActivity : ComponentActivity() {
                 val carpetaProcesada = File(directorioResultados, "${carpeta.name}_procesado")
                 val estaCompletado = carpetaProcesada.exists() && File(carpetaProcesada, ".completado").exists()
 
-                // Extraer fecha del metadata
                 val archivoMeta = File(carpeta, "metadata.txt")
                 val fechaOriginal = if (archivoMeta.exists()) archivoMeta.readText() else "Fecha Desconocida"
 
@@ -379,7 +484,6 @@ class DronActivity : ComponentActivity() {
             for (loteRemoto in estructuraRemota) {
                 val carpetaLocal = GestorLotes.crearSubcarpetaLote(this@DronActivity, loteRemoto.nombreLote)
 
-                // NUEVO: Guardar la fecha original proporcionada por el dron
                 val archivoMeta = File(carpetaLocal, "metadata.txt")
                 if (!archivoMeta.exists() && loteRemoto.fechaOriginal.isNotEmpty()) {
                     archivoMeta.writeText(loteRemoto.fechaOriginal)
@@ -426,7 +530,6 @@ class DronActivity : ComponentActivity() {
             val archivos = carpeta.listFiles { file -> file.extension.lowercase() in listOf("mp4", "avi") } ?: emptyArray()
             val totalMB = archivos.sumOf { it.length() } / (1024 * 1024)
 
-            // Extraer fecha del metadata
             val archivoMeta = File(carpeta, "metadata.txt")
             val fechaOriginal = if (archivoMeta.exists()) archivoMeta.readText() else "Fecha Desconocida"
 
@@ -472,6 +575,11 @@ class DronActivity : ComponentActivity() {
     }
 
     private fun cambiarModo(modo: Int) {
+        // Pausar cámara si salimos del modo Enlace y Control
+        if (modo != 1 && isCameraActive) {
+            toggleCamaraTablet()
+        }
+
         panelControl.visibility = View.GONE
         panelDescarga.visibility = View.GONE
         panelProcesamiento.visibility = View.GONE

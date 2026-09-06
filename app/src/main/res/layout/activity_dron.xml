@@ -63,9 +63,10 @@
                         android:fontFamily="monospace"
                         android:text="CANAL MULTISPECTRAL EN VIVO"
                         android:textAppearance="?attr/textAppearanceLabelMedium"
-                        android:textColor="?attr/colorPrimary"
+                        android:textColor="#D36D42"
                         android:textStyle="bold" />
 
+                    <!-- Contenedor de Video y Superposición -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
@@ -74,15 +75,74 @@
                         app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="1dp">
 
-                        <com.google.android.material.textview.MaterialTextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center"
-                            android:fontFamily="monospace"
-                            android:text="[ TRANSMISIÓN DESDE EL DRON]"
-                            android:textAppearance="?attr/textAppearanceBodyMedium"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent">
+
+                            <!-- Vista previa de la cámara -->
+                            <androidx.camera.view.PreviewView
+                                android:id="@+id/previewViewDron"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:visibility="invisible" />
+
+                            <!-- Capa para dibujar las máscaras y detecciones de YOLO -->
+                            <ImageView
+                                android:id="@+id/ivOverlayDron"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:visibility="invisible" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:id="@+id/tvPlaceholderDron"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:fontFamily="monospace"
+                                android:text="[ TRANSMISIÓN DESDE EL DRON ]"
+                                android:textAppearance="?attr/textAppearanceBodyMedium"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </FrameLayout>
                     </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Botones de Control Inferiores -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal"
+                        android:weightSum="2">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnVerDronRTMP"
+                            android:layout_width="0dp"
+                            android:layout_height="54dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:fontFamily="monospace"
+                            android:text="VER DRON (RTMP)"
+                            android:textColor="#000000"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            app:backgroundTint="#D36D42"
+                            app:cornerRadius="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCamaraTablet"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="54dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:fontFamily="monospace"
+                            android:text="CÁMARA TABLET"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            app:cornerRadius="8dp"
+                            app:strokeColor="#2A2F3A"
+                            app:strokeWidth="1.5dp" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <!-- VISTA 2: DESCARGA Y SINCRONIZACIÓN OTOÑAL -->

@@ -66,4 +66,10 @@ dependencies {
     implementation(project(":opencv"))
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-free-81:8.1.7")
     implementation("com.google.android.material:material:1.11.0")
+    // CameraX para captura y análisis en vivo
+    val cameraxVersion = "1.4.1"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
 }
