@@ -23,41 +23,29 @@ class DrawImages(private val context: Context) {
     )
 
     fun invoke(results: List<SegmentationResult>) : Bitmap {
-        val width = results.first().mask[0].size
-        val height = results.first().mask.size
+        // Obtenemos el ancho y alto a partir de la resolución de la pantalla de la tablet (el frame original)
+        // Ya no leemos desde la máscara
+        val width = 640 // Si necesitas que el overlay escale a pantalla completa dinámicamente,
+        val height = 480 // este canvas será ajustado por el ScaleType del ImageView
+
         val combined = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(combined)
 
         results.forEach { result ->
             val colorResId = boxColors[result.box.cls % 10]
-            applyTransparentOverlay(context, combined, result, colorResId)
+            dibujarCaja(context, canvas, width, height, result.box, colorResId)
         }
         return combined
     }
 
-    private fun applyTransparentOverlay(context: Context, overlay: Bitmap, segmentationResult: SegmentationResult, overlayColorResId: Int) {
-        val width = overlay.width
-        val height = overlay.height
-
+    private fun dibujarCaja(context: Context, canvas: Canvas, width: Int, height: Int, box: Output0, overlayColorResId: Int) {
         val overlayColor = ContextCompat.getColor(context, overlayColorResId)
 
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val maskValue = segmentationResult.mask[y][x]
-                if (maskValue > 0) {
-                    overlay.setPixel(x, y, applyTransparentOverlayColor(overlayColor))
-                }
-            }
-        }
-
-        val canvas = Canvas(overlay)
-
         val boxPaint = Paint().apply {
-            color = ContextCompat.getColor(context, overlayColorResId)
-            strokeWidth = 2F
+            color = overlayColor
+            strokeWidth = 4F
             style = Paint.Style.STROKE
         }
-
-        val box = segmentationResult.box
 
         val left = (box.x1 * width).toInt()
         val top = (box.y1 * height).toInt()
@@ -67,39 +55,36 @@ class DrawImages(private val context: Context) {
         canvas.drawRect(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat(), boxPaint)
 
         val textBackgroundPaint = Paint().apply {
-            color = ContextCompat.getColor(context, overlayColorResId)
+            color = overlayColor
             style = Paint.Style.FILL
         }
 
         val textPaint = Paint().apply {
             color = Color.WHITE
             style = Paint.Style.FILL
-            textSize = 16f
+            textSize = 14f
+            isAntiAlias = true
         }
 
+        // Formatear el texto de etiqueta + confianza (Ej: "Maduro 89%")
+        val porcentajeConfianza = (box.cnf * 100).toInt()
+        val labelText = "${box.clsName} $porcentajeConfianza%"
+
         val bounds = android.graphics.Rect()
-        textPaint.getTextBounds(box.clsName, 0, box.clsName.length, bounds)
+        textPaint.getTextBounds(labelText, 0, labelText.length, bounds)
 
         val textWidth = bounds.width()
         val textHeight = bounds.height()
-        val padding = 2
+        val padding = 4
 
         canvas.drawRect(
-            left.toFloat(),
+            left.toFloat() - 2, // Ajuste para que se solape perfecto con el borde izquierdo
             top.toFloat() - textHeight - 2 * padding,
-            left + textWidth + 2 * padding.toFloat(),
+            left.toFloat() + textWidth + 2 * padding.toFloat(),
             top.toFloat(),
             textBackgroundPaint
         )
-        canvas.drawText(box.clsName, left.toFloat() + padding, top.toFloat() - padding.toFloat(), textPaint)
-    }
 
-    private fun applyTransparentOverlayColor(color: Int): Int {
-        val alpha = 48
-        val red = Color.red(color)
-        val green = Color.green(color)
-        val blue = Color.blue(color)
-
-        return Color.argb(alpha, red, green, blue)
+        canvas.drawText(labelText, left.toFloat() + padding, top.toFloat() - padding.toFloat(), textPaint)
     }
 }
