@@ -9,10 +9,12 @@ import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
+import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.StatFs
 import android.util.Log
 import android.view.View
 import android.widget.EditText
@@ -33,6 +35,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -46,8 +49,9 @@ import org.opencv.objdetect.ArucoDetector
 import org.opencv.objdetect.DetectorParameters
 import org.opencv.objdetect.Objdetect
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.Executors
-import kotlin.concurrent.thread
+import android.os.Environment
 
 class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentationListener {
 
@@ -90,7 +94,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
     private lateinit var drawImages: DrawImages
     private val cameraExecutor = Executors.newSingleThreadExecutor()
 
-    private lateinit var etIpDron: EditText
     private lateinit var btnSincronizarLotes: MaterialButton
     private lateinit var pbSincronizacion: ProgressBar
     private lateinit var btnVolverLotes: MaterialButton
@@ -114,13 +117,13 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
 
     private lateinit var prefs: SharedPreferences
     private var mostrandoLotes = true
-    private var estaSincronizando = false
 
+    // Polling de telemetría de almacenamiento
     private val handlerTelemetria = Handler(Looper.getMainLooper())
-    private val intervaloTelemetria = 5000L
+    private val intervaloTelemetria = 3000L
     private val runnableTelemetria = object : Runnable {
         override fun run() {
-            if (!estaSincronizando) actualizarBarraTelemetria()
+            actualizarBarraTelemetria()
             handlerTelemetria.postDelayed(this, intervaloTelemetria)
         }
     }
@@ -130,6 +133,26 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
     ) { isGranted: Boolean ->
         if (isGranted) toggleCamaraTablet()
         else Toast.makeText(this, "Permiso de cámara requerido", Toast.LENGTH_SHORT).show()
+    }
+
+    // Selector SAF para abrir carpetas de memorias OTG / USB / SD
+    private var uriDispositivoConectado: Uri? = null
+
+    private val selectorCarpetaExternaLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uriCarpeta: Uri? ->
+        if (uriCarpeta != null) {
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uriCarpeta,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+            uriDispositivoConectado = uriCarpeta
+            importarLoteDesdeDispositivo(uriCarpeta)
+        } else {
+            Toast.makeText(this, "Selección cancelada", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -144,7 +167,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         setContentView(R.layout.activity_dron)
         prefs = getSharedPreferences("UchuvaTwinPrefs", Context.MODE_PRIVATE)
 
-        // Inicializar OpenCV para ArUco
         if (OpenCVLoader.initLocal()) {
             val parameters = DetectorParameters()
             val dictionary = Objdetect.getPredefinedDictionary(Objdetect.DICT_4X4_50)
@@ -169,7 +191,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         tvIconoDetect = findViewById(R.id.tvIconoDetect)
         tvIconoSeg = findViewById(R.id.tvIconoSeg)
 
-        // Botones UI ArUco
         btnConfigAruco = findViewById(R.id.btnConfigAruco)
         menuConfigAruco = findViewById(R.id.menuConfigAruco)
         etArucoSize = findViewById(R.id.etArucoSize)
@@ -225,13 +246,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
             }
         }
 
-        if (usarDeteccionObjetos) {
-            switchModeloIA.thumbTintList = ColorStateList.valueOf(Color.parseColor("#B5EC73"))
-            tvIconoDetect.setTextColor(Color.parseColor("#B5EC73"))
-            tvIconoSeg.setTextColor(Color.parseColor("#8B949E"))
-        }
-
-        etIpDron = findViewById(R.id.etIpDron)
         btnSincronizarLotes = findViewById(R.id.btnSincronizarLotes)
         pbSincronizacion = findViewById(R.id.pbSincronizacion)
         btnVolverLotes = findViewById(R.id.btnVolverLotes)
@@ -253,8 +267,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
 
         rvGestorArchivos.layoutManager = LinearLayoutManager(this)
         rvLotesProcesables.layoutManager = LinearLayoutManager(this)
-
-        etIpDron.setText(prefs.getString("IP_DRON", "192.168.1.10"))
 
         adaptadorLotesProcesables = AdapterLotesProcesables(emptyList()) { lote ->
             loteSeleccionadoParaProcesar = lote
@@ -281,7 +293,10 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
             cargarCarpetasParaProcesar()
         }
 
-        btnSincronizarLotes.setOnClickListener { ejecutarSincronizacionHTTP() }
+        // Abre el selector SAF para que el usuario elija la memoria externa o USB conectada
+        btnSincronizarLotes.setOnClickListener {
+            selectorCarpetaExternaLauncher.launch(null)
+        }
         btnVolverLotes.setOnClickListener { cargarLotesLocalesEnUI() }
         btnIniciarProcesamiento.setOnClickListener { iniciarProcesamientoMasivo() }
 
@@ -294,7 +309,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
             Toast.makeText(this, "Conectando al stream RTMP del dron...", Toast.LENGTH_SHORT).show()
         }
 
-        ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_naranja)
         cargarLotesLocalesEnUI()
 
         if (GestorProcesamiento.isProcesando) mostrarUIProcesando()
@@ -308,14 +322,28 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         vincularEventosProcesamiento()
         if (GestorProcesamiento.isProcesando) {
             mostrarUIProcesando()
-            GestorProcesamiento.onProgresoUI?.invoke(GestorProcesamiento.progresoActual, GestorProcesamiento.totalActual, GestorProcesamiento.videoActualNombre)
+            GestorProcesamiento.onProgresoUI?.invoke(
+                GestorProcesamiento.progresoActual,
+                GestorProcesamiento.totalActual,
+                GestorProcesamiento.videoActualNombre
+            )
         }
+        actualizarBarraTelemetria()
     }
 
     override fun onPause() {
         super.onPause()
         GestorProcesamiento.onProgresoUI = null
         GestorProcesamiento.onFinalizadoUI = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        cameraProvider?.unbindAll()
+        cameraExecutor.shutdown()
+        instanceSegmentation?.close()
+        objectDetection?.close()
+        handlerTelemetria.removeCallbacks(runnableTelemetria)
     }
 
     private fun vincularEventosProcesamiento() {
@@ -340,6 +368,7 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
                 btnIniciarProcesamiento.strokeWidth = 0
                 btnIniciarProcesamiento.isEnabled = false
                 cargarCarpetasParaProcesar()
+                actualizarBarraTelemetria()
             }
         }
     }
@@ -366,15 +395,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
             }
             true
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        cameraProvider?.unbindAll()
-        cameraExecutor.shutdown()
-        instanceSegmentation?.close()
-        objectDetection?.close()
-        handlerTelemetria.removeCallbacks(runnableTelemetria)
     }
 
     private fun toggleCamaraTablet() {
@@ -429,7 +449,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // EL CEREBRO DE VISIÓN ESPACIAL: Integra YOLO y ArUco
     inner class FrameAnalyzer : ImageAnalysis.Analyzer {
         override fun analyze(imageProxy: ImageProxy) {
             try {
@@ -437,7 +456,6 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
                 val matrix = Matrix().apply { postRotate(imageProxy.imageInfo.rotationDegrees.toFloat()) }
                 val rotatedBitmap = Bitmap.createBitmap(originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height, matrix, true)
 
-                // 1. Detección ArUco (OpenCV)
                 var planarMapping: PlanarMapping? = null
                 if (arucoDetector != null) {
                     val rgba = Mat()
@@ -463,37 +481,10 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
                     corners.forEach { it.release() }
                 }
 
-                // 2. Inferencia IA (YOLO)
-                // Se intercepta temporalmente el Listener para inyectarle la distancia calculada antes de dibujar
-                val interceptorListener = object : InstanceSegmentation.InstanceSegmentationListener {
-                    override fun onDetect(ifTime: Long, results: List<SegmentationResult>, preTime: Long, postTime: Long, w: Int, h: Int) {
-
-                        if (planarMapping != null) {
-                            results.forEach { result ->
-                                val pxCenter = Point2((result.box.cx * w).toDouble(), (result.box.cy * h).toDouble())
-                                val relativePos = planarMapping.project(pxCenter)
-                                if (relativePos != null) {
-                                    // Sumamos la posición absoluta (en metros) al desplazamiento X calculado
-                                    val distanciaXMetros = relativePos.xCm / 100.0
-                                    result.distanciaAbsolutaM = (arucoAnchorMeters + distanciaXMetros).toFloat()
-                                }
-                            }
-                        }
-                        this@DronActivity.onDetect(ifTime, results, preTime, postTime, w, h)
-                    }
-                    override fun onEmpty() { this@DronActivity.onEmpty() }
-                    override fun onError(error: String) { this@DronActivity.onError(error) }
-                }
-
+                this@DronActivity.currentMapping = planarMapping
                 if (usarDeteccionObjetos) {
-                    // Sustituimos el listener original temporalmente usando reflection o pasando un nuevo wrapper
-                    // Como ObjectDetection no expone un setter para el listener, llamamos invoke pero
-                    // la proyección la hacemos en onDetect de DronActivity.
-                    // Para mantener el diseño limpio, guardaremos el mapping temporalmente.
-                    this@DronActivity.currentMapping = planarMapping
                     objectDetection?.invoke(rotatedBitmap)
                 } else {
-                    this@DronActivity.currentMapping = planarMapping
                     instanceSegmentation?.invoke(rotatedBitmap)
                 }
             } catch (e: Exception) {
@@ -505,13 +496,11 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         }
     }
 
-    // Variable temporal para cruzar el mapeo de ArUco con la respuesta asíncrona de YOLO
     @Volatile var currentMapping: PlanarMapping? = null
 
     override fun onDetect(
         interfaceTime: Long, results: List<SegmentationResult>, preProcessTime: Long, postProcessTime: Long, frameWidth: Int, frameHeight: Int
     ) {
-        // Inyección geométrica: Cruzar las coordenadas píxel de YOLO con la malla de ArUco
         val mapping = currentMapping
         if (mapping != null) {
             results.forEach { result ->
@@ -572,105 +561,170 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         GestorProcesamiento.procesarLoteCompleto(this, assets, lote.rutaOrigen)
     }
 
+    // --- TELEMETRÍA DINÁMICA REAL CON STORAGEMANAGER ---
     private fun actualizarBarraTelemetria() {
-        val ipActual = prefs.getString("IP_DRON", "192.168.1.10") ?: return
-        thread {
-            val telemetria = ClienteDronHTTP.obtenerTelemetria(ipActual)
-            if (telemetria != null) {
-                val lotesRemotos = ClienteDronHTTP.obtenerEstructuraLotesRemotos(ipActual)
-                var videosPendientes = 0
-                for (lote in lotesRemotos) {
-                    val carpetaLocal = GestorLotes.crearSubcarpetaLote(this@DronActivity, lote.nombreLote)
-                    val archivosLocales = carpetaLocal.listFiles()?.map { it.name } ?: emptyList()
-                    for (videoRemoto in lote.videos) {
-                        if (!archivosLocales.contains(videoRemoto)) videosPendientes++
-                    }
-                }
-                Handler(Looper.getMainLooper()).post {
-                    tvEstadoConexion.text = "ONLINE"
-                    tvEstadoConexion.setTextColor(Color.parseColor("#A5D6A7"))
-                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_verde)
-                    val porcentajeBateria = telemetria.bateria.replace("%", "").trim().toIntOrNull() ?: 0
-                    val colorBateriaHex = when {
-                        porcentajeBateria >= 50 -> "#A5D6A7"
-                        porcentajeBateria >= 20 -> "#FFF59D"
-                        else -> "#EF9A9A"
-                    }
-                    tvBateria.text = telemetria.bateria
-                    tvBateria.setTextColor(Color.parseColor(colorBateriaHex))
-                    ivBateriaHoja.setColorFilter(Color.parseColor(colorBateriaHex))
-                    tvAlmacenamiento.text = telemetria.almacenamiento
-                    tvAlmacenamiento.setTextColor(Color.parseColor("#FFFFFF"))
-                    ivSdUchuva.clearColorFilter()
-                    if (videosPendientes > 0) {
-                        tvVideosCola.text = "NUEVOS: $videosPendientes"
-                        tvVideosCola.setTextColor(Color.parseColor("#D36D42"))
+        try {
+            // 1. Detección física mediante USB y StorageManager
+            val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+            val hayUsbFisico = (usbManager?.deviceList?.isNotEmpty() == true)
+
+            val storageManager = getSystemService(Context.STORAGE_SERVICE) as? android.os.storage.StorageManager
+            val storageVolumes = storageManager?.storageVolumes ?: emptyList()
+
+            // Filtramos los volúmenes que no son el primario interno
+            val volumenExterno = storageVolumes.firstOrNull { !it.isPrimary && it.state == android.os.Environment.MEDIA_MOUNTED }
+
+            val hayDispositivoConectado = hayUsbFisico || (volumenExterno != null) || (uriDispositivoConectado != null)
+
+            // 2. Uso en almacenamiento local de la App (carpeta UchuvaTwin_Lotes)
+            val carpetaBaseLotes = GestorLotes.obtenerCarpetaRaizLotes(this)
+            val bytesUsadosPorLotes = calcularTamanoCarpeta(carpetaBaseLotes)
+            val mbUsados = bytesUsadosPorLotes / (1024L * 1024L)
+
+            // 3. Cálculo de Usado / Total en GB del dispositivo externo
+            var textoSD = "--"
+
+            // Metodo A: Inspeccionar StorageVolume externo montado
+            if (volumenExterno != null) {
+                try {
+                    val dir = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        volumenExterno.directory
                     } else {
-                        tvVideosCola.text = "ACTUALIZADO"
-                        tvVideosCola.setTextColor(Color.parseColor("#A5D6A7"))
+                        val getPathMethod = volumenExterno.javaClass.getMethod("getPath")
+                        val path = getPathMethod.invoke(volumenExterno) as? String
+                        if (path != null) File(path) else null
                     }
-                }
-            } else {
-                Handler(Looper.getMainLooper()).post {
-                    tvEstadoConexion.text = "OFFLINE"
-                    tvEstadoConexion.setTextColor(Color.parseColor("#E57373"))
-                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_naranja)
-                    tvBateria.text = "--"
-                    tvBateria.setTextColor(Color.parseColor("#8B949E"))
-                    ivBateriaHoja.setColorFilter(Color.parseColor("#5D4037"))
-                    tvAlmacenamiento.text = "--"
-                    tvAlmacenamiento.setTextColor(Color.parseColor("#8B949E"))
-                    ivSdUchuva.setColorFilter(Color.parseColor("#5D4037"))
-                    tvVideosCola.text = "SIN RED"
-                    tvVideosCola.setTextColor(Color.parseColor("#FFB74D"))
+
+                    if (dir != null && dir.exists()) {
+                        val stat = StatFs(dir.absolutePath)
+                        val bytesTotales = stat.blockCountLong * stat.blockSizeLong
+                        val bytesLibres = stat.availableBlocksLong * stat.blockSizeLong
+                        val bytesUsados = bytesTotales - bytesLibres
+
+                        val usadosGB = bytesUsados / (1024.0 * 1024.0 * 1024.0)
+                        val totalesGB = bytesTotales / (1024.0 * 1024.0 * 1024.0)
+
+                        if (totalesGB > 0) {
+                            textoSD = String.format(java.util.Locale.US, "%.0f/%.0fGB", usadosGB, totalesGB)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("UchuvaTwin", "Error leyendo volumen externo: ${e.message}")
                 }
             }
+
+            // Metodo B: Si aún no se lee pero tenemos la Uri del selector SAF
+            if (textoSD == "--" && uriDispositivoConectado != null) {
+                try {
+                    val docId = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, uriDispositivoConectado!!)?.uri?.path ?: ""
+
+                    for (vol in storageVolumes) {
+                        val uuid = vol.uuid
+                        if (uuid != null && docId.contains(uuid, ignoreCase = true)) {
+                            val dir = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                                vol.directory
+                            } else null
+
+                            if (dir != null) {
+                                val stat = StatFs(dir.absolutePath)
+                                val bTotales = stat.blockCountLong * stat.blockSizeLong
+                                val bLibres = stat.availableBlocksLong * stat.blockSizeLong
+                                val bUsados = bTotales - bLibres
+                                val uGB = bUsados / (1024.0 * 1024.0 * 1024.0)
+                                val tGB = bTotales / (1024.0 * 1024.0 * 1024.0)
+                                textoSD = String.format(java.util.Locale.US, "%.0f/%.0fGB", uGB, tGB)
+                                break
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("UchuvaTwin", "Error leyendo por UUID: ${e.message}")
+                }
+            }
+
+            // Metodo C: Volúmenes secundarios devueltos por ContextCompat
+            if (textoSD == "--") {
+                val externalDirs = ContextCompat.getExternalFilesDirs(this, null)
+                val sdDirecta = externalDirs.firstOrNull { it != null && it != getExternalFilesDir(null) }
+                if (sdDirecta != null) {
+                    try {
+                        val stat = StatFs(sdDirecta.absolutePath)
+                        val bTotales = stat.blockCountLong * stat.blockSizeLong
+                        val bLibres = stat.availableBlocksLong * stat.blockSizeLong
+                        val bUsados = bTotales - bLibres
+                        val uGB = bUsados / (1024.0 * 1024.0 * 1024.0)
+                        val tGB = bTotales / (1024.0 * 1024.0 * 1024.0)
+                        if (tGB > 0) {
+                            textoSD = String.format(java.util.Locale.US, "%.0f/%.0fGB", uGB, tGB)
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+
+            // 4. Videos pendientes por procesar
+            val carpetasOrigen = GestorLotes.listarLotesExistentes(this)
+            val dirResultados = File(getExternalFilesDir(null), "UchuvaTwin_Resultados")
+            var videosSinProcesar = 0
+
+            for (carpeta in carpetasOrigen) {
+                val carpetaProc = File(dirResultados, "${carpeta.name}_procesado")
+                val estaCompletado = carpetaProc.exists() && File(carpetaProc, ".completado").exists()
+                if (!estaCompletado) {
+                    val count = carpeta.listFiles { f -> f.extension.lowercase() in listOf("mp4", "avi") }?.size ?: 0
+                    videosSinProcesar += count
+                }
+            }
+
+            val estaRealmenteConectado = hayDispositivoConectado && (textoSD != "--" || hayUsbFisico)
+
+            Handler(Looper.getMainLooper()).post {
+                // Estado del dispositivo
+                if (estaRealmenteConectado) {
+                    tvEstadoConexion.text = "CONECTADO"
+                    tvEstadoConexion.setTextColor(Color.parseColor("#A5D6A7"))
+                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_verde)
+                } else {
+                    tvEstadoConexion.text = "DESCONECTADO"
+                    tvEstadoConexion.setTextColor(Color.parseColor("#E57373"))
+                    ivUchuvaEstado.setImageResource(R.drawable.ic_uchuva_naranja)
+                }
+
+                // Uso de la App en MB
+                tvBateria.text = "$mbUsados MB"
+                tvBateria.setTextColor(Color.parseColor("#A5D6A7"))
+                ivBateriaHoja.setColorFilter(Color.parseColor("#A5D6A7"))
+
+                // SD Card / Almacenamiento externo en formato Usado/Total GB
+                tvAlmacenamiento.text = textoSD
+                if (textoSD != "--") {
+                    tvAlmacenamiento.setTextColor(Color.parseColor("#FFFFFF"))
+                    ivSdUchuva.clearColorFilter()
+                } else {
+                    tvAlmacenamiento.setTextColor(Color.parseColor("#8B949E"))
+                    ivSdUchuva.setColorFilter(Color.parseColor("#5D4037"))
+                }
+
+                // Lotes pendientes
+                if (videosSinProcesar > 0) {
+                    tvVideosCola.text = "POR PROC: $videosSinProcesar"
+                    tvVideosCola.setTextColor(Color.parseColor("#D36D42"))
+                } else {
+                    tvVideosCola.text = "AL DÍA"
+                    tvVideosCola.setTextColor(Color.parseColor("#A5D6A7"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("UchuvaTwin", "Error general telemetría: ${e.message}")
         }
     }
 
-    private fun ejecutarSincronizacionHTTP() {
-        val ipIngresada = etIpDron.text.toString().trim()
-        if (ipIngresada.isEmpty()) return
-        prefs.edit().putString("IP_DRON", ipIngresada).apply()
-        pbSincronizacion.visibility = View.VISIBLE
-        btnSincronizarLotes.isEnabled = false
-        estaSincronizando = true
-        Toast.makeText(this, "Sincronizando Archivos...", Toast.LENGTH_SHORT).show()
-        thread {
-            var videosNuevosDescargados = 0
-            val estructuraRemota = ClienteDronHTTP.obtenerEstructuraLotesRemotos(ipIngresada)
-            if (estructuraRemota.isEmpty()) {
-                Handler(Looper.getMainLooper()).post {
-                    pbSincronizacion.visibility = View.GONE
-                    btnSincronizarLotes.isEnabled = true
-                    estaSincronizando = false
-                    Toast.makeText(this@DronActivity, "Error de red: ${ClienteDronHTTP.ultimoErrorDiagnostico}", Toast.LENGTH_LONG).show()
-                }
-                return@thread
-            }
-            for (loteRemoto in estructuraRemota) {
-                val carpetaLocal = GestorLotes.crearSubcarpetaLote(this@DronActivity, loteRemoto.nombreLote)
-                val archivoMeta = File(carpetaLocal, "metadata.txt")
-                if (!archivoMeta.exists() && loteRemoto.fechaOriginal.isNotEmpty()) archivoMeta.writeText(loteRemoto.fechaOriginal)
-                val archivosLocales = carpetaLocal.listFiles()?.map { it.name } ?: emptyList()
-                for (nombreVideo in loteRemoto.videos) {
-                    if (!archivosLocales.contains(nombreVideo)) {
-                        val archivoDestino = File(carpetaLocal, nombreVideo)
-                        val exitoDescarga = ClienteDronHTTP.descargarVideoRemoto(ipIngresada, 8080, loteRemoto.nombreLote, nombreVideo, archivoDestino)
-                        if (exitoDescarga) videosNuevosDescargados++
-                    }
-                }
-            }
-            Handler(Looper.getMainLooper()).post {
-                pbSincronizacion.visibility = View.GONE
-                btnSincronizarLotes.isEnabled = true
-                estaSincronizando = false
-                if (videosNuevosDescargados > 0) Toast.makeText(this@DronActivity, "¡Éxito! $videosNuevosDescargados videos descargados.", Toast.LENGTH_LONG).show()
-                else Toast.makeText(this@DronActivity, "El dispositivo ya está actualizado.", Toast.LENGTH_SHORT).show()
-                cargarLotesLocalesEnUI()
-                actualizarBarraTelemetria()
-            }
+    private fun calcularTamanoCarpeta(directorio: File): Long {
+        var tamano: Long = 0
+        val archivos = directorio.listFiles() ?: return 0L
+        for (archivo in archivos) {
+            tamano += if (archivo.isDirectory) calcularTamanoCarpeta(archivo) else archivo.length()
         }
+        return tamano
     }
 
     private fun cargarLotesLocalesEnUI() {
@@ -753,5 +807,80 @@ class DronActivity : ComponentActivity(), InstanceSegmentation.InstanceSegmentat
         cardDescarga.strokeWidth = 2
         cardProcesar.strokeColor = inactivoBorde
         cardProcesar.strokeWidth = 2
+    }
+
+    private fun importarLoteDesdeDispositivo(treeUri: Uri) {
+        val rootDoc = DocumentFile.fromTreeUri(this, treeUri)
+        if (rootDoc == null || !rootDoc.isDirectory) {
+            Toast.makeText(this, "No se pudo acceder a la carpeta seleccionada", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val nombreLote = rootDoc.name ?: "LOTE_EXTERNO_${System.currentTimeMillis()}"
+
+        pbSincronizacion.visibility = View.VISIBLE
+        btnSincronizarLotes.isEnabled = false
+        Toast.makeText(this, "Importando lote: $nombreLote...", Toast.LENGTH_SHORT).show()
+
+        Thread {
+            try {
+                val carpetaDestino = GestorLotes.crearSubcarpetaLote(this, nombreLote)
+                val archivosEnOrigen = rootDoc.listFiles()
+
+                val videosAImportar = archivosEnOrigen.filter {
+                    val ext = it.name?.substringAfterLast('.', "")?.lowercase() ?: ""
+                    ext in listOf("mp4", "avi")
+                }
+                val archivoMetaDoc = archivosEnOrigen.firstOrNull { it.name.equals("metadata.txt", ignoreCase = true) }
+
+                // Copiar o generar metadata.txt
+                if (archivoMetaDoc != null) {
+                    val metaDestino = File(carpetaDestino, "metadata.txt")
+                    contentResolver.openInputStream(archivoMetaDoc.uri)?.use { input ->
+                        FileOutputStream(metaDestino).use { output -> input.copyTo(output) }
+                    }
+                } else {
+                    val metaDestino = File(carpetaDestino, "metadata.txt")
+                    if (!metaDestino.exists()) {
+                        val fechaHoy = java.text.SimpleDateFormat("yyyy/MM/dd - HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                        metaDestino.writeText(fechaHoy)
+                    }
+                }
+
+                // Copiar videos
+                var videosCopiados = 0
+                for (videoDoc in videosAImportar) {
+                    val nombreArchivo = videoDoc.name ?: continue
+                    val archivoDestino = File(carpetaDestino, nombreArchivo)
+
+                    if (archivoDestino.exists() && archivoDestino.length() == videoDoc.length()) {
+                        continue
+                    }
+
+                    contentResolver.openInputStream(videoDoc.uri)?.use { input ->
+                        FileOutputStream(archivoDestino).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    videosCopiados++
+                }
+
+                Handler(Looper.getMainLooper()).post {
+                    pbSincronizacion.visibility = View.GONE
+                    btnSincronizarLotes.isEnabled = true
+                    Toast.makeText(this@DronActivity, "¡Éxito! $videosCopiados videos importados al lote $nombreLote.", Toast.LENGTH_LONG).show()
+                    cargarLotesLocalesEnUI()
+                    actualizarBarraTelemetria()
+                }
+
+            } catch (e: Exception) {
+                Log.e("UchuvaTwin", "Fallo al importar lote físico: ${e.message}", e)
+                Handler(Looper.getMainLooper()).post {
+                    pbSincronizacion.visibility = View.GONE
+                    btnSincronizarLotes.isEnabled = true
+                    Toast.makeText(this@DronActivity, "Error durante la copia: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 }

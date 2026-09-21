@@ -262,7 +262,7 @@
                     </com.google.android.material.card.MaterialCardView>
                 </FrameLayout>
 
-                <!-- VISTA 2: DESCARGA Y SINCRONIZACIÓN OTOÑAL -->
+                <!-- VISTA 2: DESCARGA Y SINCRONIZACIÓN FÍSICA -->
                 <LinearLayout
                     android:id="@+id/panelDescarga"
                     android:layout_width="match_parent"
@@ -276,55 +276,25 @@
                         android:layout_marginBottom="12dp"
                         android:fontFamily="monospace"
                         android:letterSpacing="0.05"
-                        android:text="PANEL DE SINCRONIZACIÓN HTTP"
+                        android:text="IMPORTACIÓN DE ARCHIVOS (MEMORIA EXTERNA / USB)"
                         android:textAppearance="?attr/textAppearanceLabelMedium"
                         android:textColor="#D36D42"
                         android:textStyle="bold" />
 
-                    <!-- Barra de Control IP + Botón Sincronizar Balanceados -->
-                    <LinearLayout
+                    <!-- Botón visible de ancho completo -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSincronizarLotes"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:hint="IP del Dron"
-                            app:boxBackgroundColor="#171513"
-                            app:boxStrokeColor="#7A8B62"
-                            app:hintTextColor="#BCAAA4">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etIpDron"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="monospace"
-                                android:inputType="textUri"
-                                android:singleLine="true"
-                                android:textColor="#FFFFFF"
-                                android:textSize="13sp" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <!-- Botón en Tono Verde Olivo / Pastel estructurado -->
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnSincronizarLotes"
-                            android:layout_width="wrap_content"
-                            android:layout_height="56dp"
-                            android:layout_marginStart="12dp"
-                            android:fontFamily="sans-serif-black"
-                            android:letterSpacing="0.05"
-                            android:text="⬇ SINCRONIZAR"
-                            android:textColor="#000000"
-                            android:textSize="11sp"
-                            app:backgroundTint="#D36D42"
-                            app:cornerRadius="12dp"
-                            app:elevation="2dp" />
-                    </LinearLayout>
+                        android:layout_height="54dp"
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="sans-serif-black"
+                        android:letterSpacing="0.05"
+                        android:text="📂 ABRIR DISPOSITIVO / MEMORIA EXTERNA"
+                        android:textColor="#000000"
+                        android:textSize="12sp"
+                        app:backgroundTint="#D36D42"
+                        app:cornerRadius="12dp"
+                        app:elevation="3dp" />
 
                     <com.google.android.material.progressindicator.LinearProgressIndicator
                         android:id="@+id/pbSincronizacion"
@@ -346,7 +316,7 @@
                         android:textSize="11sp"
                         android:visibility="gone" />
 
-                    <!-- RecyclerView donde se despliegan las carpetas con el nuevo formato -->
+                    <!-- RecyclerView de lotes locales -->
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/rvGestorArchivos"
                         android:layout_width="match_parent"

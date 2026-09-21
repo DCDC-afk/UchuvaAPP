@@ -34,7 +34,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.05"
-                android:text="ENLACE DRON"
+                android:text="DISPOSITIVO"
                 android:textColor="#BCAAA4"
                 android:textSize="10sp" />
 
@@ -78,7 +78,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.05"
-                android:text="BATERÍA"
+                android:text="USO APP"
                 android:textColor="#BCAAA4"
                 android:textSize="10sp" />
 
